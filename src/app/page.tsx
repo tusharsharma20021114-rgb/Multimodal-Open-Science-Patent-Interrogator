@@ -1,65 +1,153 @@
-import Image from "next/image";
+import Link from "next/link";
+import {
+  Upload,
+  MessageSquare,
+  BarChart3,
+  Eye,
+  Cpu,
+  Database,
+  ArrowRight,
+  Sparkles,
+} from "lucide-react";
 
-export default function Home() {
+export default function HomePage() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <>
+      {/* Hero Section */}
+      <section className="hero">
+        <div className="hero-content">
+          <div className="hero-badge">
+            <Sparkles size={14} />
+            Powered by Gemini AI — Free Tier
+          </div>
+          <h1>
+            Multimodal{" "}
+            <span className="gradient-text">RAG Engine</span>
+            <br />
+            for Science & Patents
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p>
+            Upload scientific papers and patents, automatically extract diagrams
+            with in-browser AI vision, and interrogate your documents with a
+            multimodal retrieval-augmented generation pipeline.
+          </p>
+          <div className="hero-actions">
+            <Link href="/upload" className="btn-primary">
+              <Upload size={18} />
+              Upload Document
+            </Link>
+            <Link href="/chat" className="btn-secondary">
+              <MessageSquare size={18} />
+              Start Chat
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Features Grid */}
+      <section className="features-grid">
+        <div className="glass-card feature-card">
+          <div
+            className="feature-icon"
+            style={{ background: "rgba(99, 102, 241, 0.1)", color: "#6366f1" }}
+          >
+            <Upload size={24} />
+          </div>
+          <h3 className="feature-title">Smart PDF Ingestion</h3>
+          <p className="feature-desc">
+            Upload any PDF document. The engine automatically extracts text,
+            splits it into contextual chunks with overlap, and generates vector
+            embeddings for semantic search.
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+
+        <div className="glass-card feature-card">
+          <div
+            className="feature-icon"
+            style={{ background: "rgba(6, 182, 212, 0.1)", color: "#06b6d4" }}
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            <Eye size={24} />
+          </div>
+          <h3 className="feature-title">Browser AI Vision</h3>
+          <p className="feature-desc">
+            DETR object detection runs directly in your browser via
+            Transformers.js. Diagrams, charts, and figures are automatically
+            detected and cropped — zero server cost.
+          </p>
         </div>
-      </main>
-    </div>
+
+        <div className="glass-card feature-card">
+          <div
+            className="feature-icon"
+            style={{
+              background: "rgba(139, 92, 246, 0.1)",
+              color: "#8b5cf6",
+            }}
+          >
+            <Cpu size={24} />
+          </div>
+          <h3 className="feature-title">Multimodal RAG Chat</h3>
+          <p className="feature-desc">
+            Ask questions about your documents. The engine retrieves the most
+            relevant text chunks and associated diagrams, then generates a
+            streaming response with Gemini 1.5 Flash.
+          </p>
+        </div>
+
+        <div className="glass-card feature-card">
+          <div
+            className="feature-icon"
+            style={{
+              background: "rgba(16, 185, 129, 0.1)",
+              color: "#10b981",
+            }}
+          >
+            <Database size={24} />
+          </div>
+          <h3 className="feature-title">Vector Database</h3>
+          <p className="feature-desc">
+            Powered by Supabase PostgreSQL with pgvector. HNSW indexing enables
+            blazing-fast cosine similarity search across all your document
+            embeddings.
+          </p>
+        </div>
+
+        <div className="glass-card feature-card">
+          <div
+            className="feature-icon"
+            style={{
+              background: "rgba(245, 158, 11, 0.1)",
+              color: "#f59e0b",
+            }}
+          >
+            <BarChart3 size={24} />
+          </div>
+          <h3 className="feature-title">Analytics Dashboard</h3>
+          <p className="feature-desc">
+            Monitor system health with real-time metrics: document count,
+            embedding coverage, query volume, and extraction statistics —
+            visualized with interactive charts.
+          </p>
+        </div>
+
+        <div className="glass-card feature-card">
+          <div
+            className="feature-icon"
+            style={{
+              background: "rgba(244, 63, 94, 0.1)",
+              color: "#f43f5e",
+            }}
+          >
+            <ArrowRight size={24} />
+          </div>
+          <h3 className="feature-title">Vercel + Free Stack</h3>
+          <p className="feature-desc">
+            Deploys on Vercel free tier. Uses Supabase free tier for database
+            and storage, Gemini free tier for AI — fully operational at zero
+            cost.
+          </p>
+        </div>
+      </section>
+    </>
   );
 }
