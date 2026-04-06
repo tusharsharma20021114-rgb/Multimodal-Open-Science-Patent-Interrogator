@@ -228,6 +228,124 @@ match_document_chunks(query_embedding, match_threshold, match_count, filter_docu
 
 ---
 
+## 🔬 Build Walkthrough
+
+This section documents the complete development process and what each component does.
+
+### What Was Built
+
+A complete **Multimodal Open-Science & Patent Interrogator** — a full-stack Next.js application with **5 integrated systems**:
+
+| System | Description |
+|--------|-------------|
+| **📄 PDF Ingestion Pipeline** | Upload → Text Extraction (`pdf-parse`) → Chunking (500w, 50 overlap) → Embedding (`Gemini text-embedding-004`) → Store in Supabase pgvector |
+| **👁️ Browser AI Vision** | PDF Canvas Rendering → DETR ResNet-50 Object Detection (`Transformers.js`) → Auto-crop Diagrams → Upload to Supabase Storage |
+| **💬 RAG Chat Engine** | User Query → Query Embedding → Cosine Similarity Search (RPC) → Context + Images Assembly → Gemini 1.5 Flash Streaming Response |
+| **📊 Analytics Dashboard** | Password Gate → KPI Cards (docs, chunks, queries, diagrams) → Time-series Charts (Recharts) → Recent Documents Table |
+| **🎨 Premium UI** | Dark Glassmorphism Design System → Animated Gradients → Micro-animations → Responsive Layout |
+
+### Data Flow
+
+```
+User uploads PDF
+       │
+       ▼
+┌──────────────────┐
+│  pdf-parse        │──→ Raw text extracted
+│  (server-side)    │
+└──────────────────┘
+       │
+       ▼
+┌──────────────────┐
+│  Chunker          │──→ 500-word blocks with 50-word overlap
+│  (lib/chunker.ts) │
+└──────────────────┘
+       │
+       ▼
+┌──────────────────┐
+│  Gemini Embeddings│──→ 768-dimensional vectors per chunk
+│  (text-embedding  │
+│   -004)           │
+└──────────────────┘
+       │
+       ▼
+┌──────────────────┐
+│  Supabase         │──→ document_chunks table (HNSW indexed)
+│  (pgvector)       │    document-assets bucket (PDF + diagrams)
+└──────────────────┘
+       │
+       ▼
+User asks a question
+       │
+       ▼
+┌──────────────────┐
+│  Query Embedding  │──→ Same 768-dim vector space
+└──────────────────┘
+       │
+       ▼
+┌──────────────────┐
+│  match_document_  │──→ Top-5 most similar chunks + diagrams
+│  chunks() RPC     │    (cosine similarity > 0.5 threshold)
+└──────────────────┘
+       │
+       ▼
+┌──────────────────┐
+│  Gemini 1.5 Flash │──→ Streaming markdown response
+│  (with context)   │    grounded in retrieved documents
+└──────────────────┘
+```
+
+### Files Created — Complete Inventory
+
+| File | Purpose | Key Implementation Detail |
+|------|---------|--------------------------|
+| `next.config.ts` | Turbopack config, server externals, Supabase image domains | `serverExternalPackages: ["pdf-parse"]` for Node.js compatibility |
+| `supabase-migration.sql` | Full DB schema with 3 tables, pgvector, RPC function, HNSW index, RLS | `vector(768)` columns with `vector_cosine_ops` operator class |
+| `src/lib/supabase.ts` | Client-side + server-side Supabase clients | Dual client pattern: anon key for browser, service role for API routes |
+| `src/lib/gemini.ts` | Gemini embeddings (768-dim) + streaming chat | Batched embedding calls + `generateContentStream()` for real-time responses |
+| `src/lib/chunker.ts` | Text chunking engine | 500-word blocks with 50-word sliding overlap for context continuity |
+| `src/app/api/upload-document/route.ts` | PDF upload → extract → chunk → embed → store | Batch insertion of 20 chunks at a time to avoid Supabase limits |
+| `src/app/api/upload-diagram/route.ts` | Cropped diagram upload + chunk linking | Links diagram images to nearest document chunks via `image_url` column |
+| `src/app/api/chat/route.ts` | RAG query → similarity search → streaming Gemini | `match_document_chunks` RPC with configurable threshold + document filter |
+| `src/app/api/analytics/route.ts` | Dashboard metrics aggregation | Aggregates across 3 tables + generates time-series data for charts |
+| `src/app/page.tsx` | Landing page with hero + feature grid | Animated gradient text + glassmorphism feature cards |
+| `src/app/upload/page.tsx` | Drag-drop upload with progress + document list | Real-time upload progress bar + automatic document list refresh |
+| `src/app/chat/page.tsx` | Streaming chat with markdown, document filter | `ReadableStream` consumption for character-by-character streaming display |
+| `src/app/dashboard/page.tsx` | Password gate → KPI cards + Recharts charts | Client-side password check → conditional rendering of full analytics |
+| `src/components/NavBar.tsx` | Glassmorphism navigation with active route | `usePathname()` hook for active state detection |
+| `src/components/PDFViewer.tsx` | PDF canvas renderer with page nav + zoom | `pdfjs-dist` web worker for off-thread PDF rendering |
+| `src/components/DiagramDetector.tsx` | In-browser DETR detection + bounding boxes | `@xenova/transformers` pipeline runs entirely client-side (zero server cost) |
+| `src/app/globals.css` | Full design system: glassmorphism, animations | CSS custom properties + `backdrop-filter` + `@keyframes` animations |
+
+### Verification Results
+
+```
+✅ npx tsc --noEmit          → Zero TypeScript errors
+✅ npm run build             → All routes compiled successfully
+✅ Dev server (npm run dev)  → All 4 pages render correctly
+✅ API test (curl /api/analytics) → Supabase connection verified
+✅ Vercel deployment         → Production build succeeded
+✅ Live site                 → All pages accessible at production URL
+```
+
+### Deployment Checklist
+
+```
+✅ GitHub repository created and code pushed
+✅ Supabase project provisioned (free tier)
+✅ pgvector extension enabled
+✅ Database tables created (documents, document_chunks, query_logs)
+✅ HNSW index created for vector similarity search
+✅ RPC function (match_document_chunks) deployed
+✅ Row Level Security policies configured
+✅ Storage bucket (document-assets) created as public
+✅ Gemini API key configured (free tier)
+✅ Environment variables set in Vercel
+✅ Production deployment live on Vercel
+```
+
+---
+
 ## 📄 License
 
 MIT
