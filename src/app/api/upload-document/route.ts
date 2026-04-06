@@ -3,7 +3,8 @@ import { getServiceSupabase } from "@/lib/supabase";
 import { chunkText } from "@/lib/chunker";
 import { generateEmbeddings } from "@/lib/gemini";
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const pdfParse = require("pdf-parse");
+const pdfParseModule = require("pdf-parse");
+const pdfParse = pdfParseModule.default || pdfParseModule;
 
 export const maxDuration = 60; // Vercel free tier max
 
