@@ -67,7 +67,8 @@ export async function generateEmbeddings(
 }
 
 /**
- * Stream a multimodal chat response from Gemini 1.5 Flash (free tier).
+ * Stream a multimodal chat response from Gemini 2.0 Flash (free tier).
+ * Includes retry logic for rate limits.
  */
 export async function streamChat(
   systemPrompt: string,
@@ -98,6 +99,27 @@ export async function streamChat(
 
   parts.push({ text: `## User Query:\n${userMessage}` });
 
-  const result = await model.generateContentStream({ contents: [{ role: "user", parts }] });
-  return result.stream;
+  // Retry with exponential backoff for rate limits
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      const result = await model.generateContentStream({
+        contents: [{ role: "user", parts }],
+      });
+      return result.stream;
+    } catch (err: unknown) {
+      const errorMessage =
+        err instanceof Error ? err.message : String(err);
+      if (errorMessage.includes("429") && attempt < 3) {
+        const waitMs = Math.pow(2, attempt) * 3000 + Math.random() * 2000;
+        console.log(
+          `Chat rate limited, retrying in ${(waitMs / 1000).toFixed(1)}s...`
+        );
+        await new Promise((r) => setTimeout(r, waitMs));
+        continue;
+      }
+      throw err;
+    }
+  }
+
+  throw new Error("Chat failed after 4 retries");
 }
