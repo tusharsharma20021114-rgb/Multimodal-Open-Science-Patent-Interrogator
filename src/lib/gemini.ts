@@ -11,15 +11,34 @@ function getClient() {
  * Returns a 768-dimensional vector.
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
-  const genAI = getClient();
-  const model = genAI.getGenerativeModel({ model: "text-embedding-004" });
-  const result = await model.embedContent(text);
-  return result.embedding.values;
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("GEMINI_API_KEY is not set");
+
+  // Use REST API directly to pass outputDimensionality (SDK doesn't support it)
+  const resp = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        content: { parts: [{ text }] },
+        outputDimensionality: 768,
+      }),
+    }
+  );
+
+  if (!resp.ok) {
+    const err = await resp.text();
+    throw new Error(`Embedding API error: ${resp.status} - ${err}`);
+  }
+
+  const data = await resp.json();
+  return data.embedding.values;
 }
 
 /**
  * Generate embeddings for multiple texts in sequence.
- * Gemini free tier has rate limits, so we process sequentially with small delays.
+ * We process sequentially to avoid overwhelming the API.
  */
 export async function generateEmbeddings(
   texts: string[]
@@ -29,7 +48,7 @@ export async function generateEmbeddings(
     const embedding = await generateEmbedding(texts[i]);
     embeddings.push(embedding);
     // Small delay to respect free tier rate limits (15 RPM)
-    if (i < texts.length - 1 && (i + 1) % 10 === 0) {
+    if (i < texts.length - 1 && (i + 1) % 5 === 0) {
       await new Promise((r) => setTimeout(r, 1000));
     }
   }
@@ -46,7 +65,7 @@ export async function streamChat(
 ) {
   const genAI = getClient();
   const model = genAI.getGenerativeModel({
-    model: "gemini-1.5-flash",
+    model: "gemini-2.0-flash",
     systemInstruction: systemPrompt,
   });
 

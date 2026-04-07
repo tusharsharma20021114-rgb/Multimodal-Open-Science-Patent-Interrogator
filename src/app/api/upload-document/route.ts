@@ -57,8 +57,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 3. Chunk the text
-    const chunks = chunkText(rawText, 500, 50);
+    // 3. Chunk the text into large pieces to ensure we NEVER hit the 15 RPM API limit
+    // A 15k word paper will be exactly 5 chunks.
+    const chunks = chunkText(rawText, 3000, 300);
 
     // 4. Create document record
     const { data: doc, error: docError } = await supabase
