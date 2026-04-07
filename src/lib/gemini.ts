@@ -14,31 +14,42 @@ export async function generateEmbedding(text: string): Promise<number[]> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY is not set");
 
-  // Use REST API directly to pass outputDimensionality (SDK doesn't support it)
-  const resp = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        content: { parts: [{ text }] },
-        outputDimensionality: 768,
-      }),
-    }
-  );
+  // Retry with exponential backoff for rate limits
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          content: { parts: [{ text }] },
+          outputDimensionality: 768,
+        }),
+      }
+    );
 
-  if (!resp.ok) {
+    if (resp.ok) {
+      const data = await resp.json();
+      return data.embedding.values;
+    }
+
+    if (resp.status === 429 && attempt < 4) {
+      const waitMs = Math.pow(2, attempt) * 2000 + Math.random() * 1000;
+      console.log(`Rate limited, retrying in ${(waitMs / 1000).toFixed(1)}s...`);
+      await new Promise((r) => setTimeout(r, waitMs));
+      continue;
+    }
+
     const err = await resp.text();
     throw new Error(`Embedding API error: ${resp.status} - ${err}`);
   }
 
-  const data = await resp.json();
-  return data.embedding.values;
+  throw new Error("Embedding failed after 5 retries");
 }
 
 /**
  * Generate embeddings for multiple texts in sequence.
- * We process sequentially to avoid overwhelming the API.
+ * Aggressive rate limiting for free tier (1500 RPM for embeddings).
  */
 export async function generateEmbeddings(
   texts: string[]
@@ -47,9 +58,9 @@ export async function generateEmbeddings(
   for (let i = 0; i < texts.length; i++) {
     const embedding = await generateEmbedding(texts[i]);
     embeddings.push(embedding);
-    // Small delay to respect free tier rate limits (15 RPM)
-    if (i < texts.length - 1 && (i + 1) % 5 === 0) {
-      await new Promise((r) => setTimeout(r, 1000));
+    // Delay between each call to stay within rate limits
+    if (i < texts.length - 1) {
+      await new Promise((r) => setTimeout(r, 200));
     }
   }
   return embeddings;
