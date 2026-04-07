@@ -58,6 +58,26 @@ export async function POST(request: NextRequest) {
       })
     );
 
+    // If no chunks found, return a helpful message instead of hallucinating
+    if (contextChunks.length === 0) {
+      await supabase.from("query_logs").insert({
+        query,
+        chunks_retrieved: 0,
+        document_id: documentId || null,
+      });
+
+      const noContextMsg = documentId
+        ? "I couldn't find any relevant content in this document for your query. This may happen if the document hasn't been fully processed yet. Please try re-uploading the document or selecting 'All documents'."
+        : "I couldn't find any relevant content across your documents for this query. Please make sure you've uploaded documents first.";
+
+      return new Response(noContextMsg, {
+        headers: {
+          "Content-Type": "text/plain; charset=utf-8",
+          "Cache-Control": "no-cache",
+        },
+      });
+    }
+
     // 3. Log query for analytics
     await supabase.from("query_logs").insert({
       query,
