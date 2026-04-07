@@ -61,6 +61,13 @@ export async function POST(request: NextRequest) {
     // A 15k word paper will be exactly 5 chunks.
     const chunks = chunkText(rawText, 3000, 300);
 
+    // 3b. Count figures/diagrams referenced in the text
+    const figureMatches = rawText.match(/(?:Fig(?:ure)?\.?\s*\d+|TABLE\s+[IVX\d]+)/gi);
+    const uniqueFigures = new Set(
+      (figureMatches || []).map((m: string) => m.replace(/\s+/g, " ").toLowerCase())
+    );
+    const diagramCount = uniqueFigures.size;
+
     // 4. Create document record
     const { data: doc, error: docError } = await supabase
       .from("documents")
@@ -73,6 +80,7 @@ export async function POST(request: NextRequest) {
         },
         file_url: publicUrl,
         total_chunks: chunks.length,
+        diagrams_extracted: diagramCount,
       })
       .select("id")
       .single();
