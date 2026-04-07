@@ -57,9 +57,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 3. Chunk the text into large pieces to ensure we NEVER hit the 15 RPM API limit
-    // A 15k word paper will be exactly 5 chunks.
-    const chunks = chunkText(rawText, 3000, 300);
+    // 3. Chunk the text with math-aware, section-aware splitting
+    // 1000-word chunks with 200-word overlap — good balance of granularity & context
+    const chunks = chunkText(rawText, 1000, 200);
 
     // 3b. Count figures/diagrams referenced in the text
     const figureMatches = rawText.match(/(?:Fig(?:ure)?\.?\s*\d+|TABLE\s+[IVX\d]+)/gi);

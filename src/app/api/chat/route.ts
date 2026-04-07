@@ -1,20 +1,51 @@
 import { NextRequest } from "next/server";
 import { getServiceSupabase } from "@/lib/supabase";
 import { generateEmbedding, streamChat } from "@/lib/gemini";
+import type { ContextChunk } from "@/lib/gemini";
 
 export const maxDuration = 30;
 
-const SYSTEM_PROMPT = `You are an expert technical analyst and research assistant for the Multimodal Open-Science & Patent Interrogator system. 
+const SYSTEM_PROMPT = `You are an expert technical analyst and research assistant for the Multimodal Open-Science & Patent Interrogator system.
 
-Your role:
-- Analyze scientific papers, patents, and technical documents
-- Explain complex diagrams, charts, and technical figures when referenced
-- Provide precise, well-structured answers grounded in the retrieved context
-- If the context doesn't contain enough information, say so honestly
-- Use markdown formatting for clarity (headers, lists, code blocks, bold text)
-- Reference specific chunks or diagrams when relevant
+## Your Core Mission
+You provide **comprehensive, detailed, and thorough** answers grounded entirely in the retrieved document context. Your answers should be as detailed as a graduate-level textbook explanation.
 
-Always base your answers on the provided context. If diagrams are referenced, describe what they show based on the surrounding text context.`;
+## Response Guidelines
+
+### Length & Depth
+- Provide **multi-paragraph, in-depth** answers — minimum 300-500 words for substantive questions
+- Never give one-line or bullet-point-only answers for technical questions
+- If the user asks about a concept, explain it thoroughly: definition → intuition → mathematical formulation → practical implications
+- Include relevant background and connections between concepts when present in the context
+
+### Mathematical Content
+- When mathematical formulas or equations appear in the context, **explain them step-by-step**:
+  1. State the formula clearly using LaTeX notation ($$...$$ for display math, $...$ for inline)
+  2. Define every variable and symbol
+  3. Explain the intuition behind the formula — what does it compute and why?
+  4. Describe how it fits into the broader method/algorithm
+- Do NOT skip over equations — they are critical to understanding the research
+
+### Diagrams & Figures
+- When figures, tables, or diagrams are referenced in the context, **describe them in thorough detail**:
+  - What type of visualization is it? (architecture diagram, flowchart, bar chart, table, etc.)
+  - What are the components, nodes, layers, or elements shown?
+  - What are the connections, arrows, or data flows?
+  - What does the figure demonstrate or prove?
+  - Reference the figure number (e.g., "As shown in Figure 3...")
+- Synthesize information from the surrounding text to give a complete picture of what the diagram shows
+
+### Structure & Formatting
+- Use rich markdown formatting: headers (##, ###), bold, lists, code blocks, tables
+- Use LaTeX math blocks for equations
+- Organize long answers with clear sections
+- Reference specific chunk numbers when citing information (e.g., "[from Chunk 3]")
+
+### Grounding & Honesty
+- Base ALL answers on the provided context — never hallucinate
+- If the context doesn't contain enough information, say so honestly and explain what information IS available
+- If only partial information is available, provide what you can and note the gaps
+- Distinguish between what the document states vs. your interpretation`;
 
 export async function POST(request: NextRequest) {
   try {
@@ -32,13 +63,13 @@ export async function POST(request: NextRequest) {
     // 1. Generate embedding for the query
     const queryEmbedding = await generateEmbedding(query);
 
-    // 2. Perform similarity search via RPC
+    // 2. Perform similarity search via RPC — retrieve MORE chunks for richer context
     const { data: chunks, error: searchError } = await supabase.rpc(
       "match_document_chunks",
       {
         query_embedding: JSON.stringify(queryEmbedding),
-        match_threshold: 0.3,
-        match_count: 5,
+        match_threshold: 0.2,   // Lowered from 0.3 to capture more marginally relevant chunks
+        match_count: 15,        // Increased from 5 to 15 for much richer context
         filter_document_id: documentId || null,
       }
     );
@@ -51,10 +82,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const contextChunks = (chunks || []).map(
-      (c: { text_content: string; image_url: string | null }) => ({
+    // Build context chunks with similarity scores and chunk indices
+    const contextChunks: ContextChunk[] = (chunks || []).map(
+      (c: {
+        text_content: string;
+        image_url: string | null;
+        similarity: number;
+        chunk_index: number;
+      }) => ({
         text: c.text_content,
         imageUrl: c.image_url || undefined,
+        similarity: c.similarity,
+        chunkIndex: c.chunk_index,
       })
     );
 
@@ -85,7 +124,7 @@ export async function POST(request: NextRequest) {
       document_id: documentId || null,
     });
 
-    // 4. Stream response from Gemini
+    // 4. Stream response from Gemini with enriched context
     const stream = await streamChat(SYSTEM_PROMPT, query, contextChunks);
 
     // Convert to ReadableStream for the response
@@ -104,8 +143,8 @@ export async function POST(request: NextRequest) {
             _meta: true,
             chunksUsed: contextChunks.length,
             images: contextChunks
-              .filter((c: { imageUrl?: string }) => c.imageUrl)
-              .map((c: { imageUrl?: string }) => c.imageUrl),
+              .filter((c) => c.imageUrl)
+              .map((c) => c.imageUrl),
           });
           controller.enqueue(encoder.encode(`\n<!--META:${metadata}-->`));
           controller.close();

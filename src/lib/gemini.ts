@@ -67,37 +67,85 @@ export async function generateEmbeddings(
 }
 
 /**
- * Stream a multimodal chat response from Gemini 2.0 Flash (free tier).
+ * Context chunk with similarity score for richer LLM context.
+ */
+export interface ContextChunk {
+  text: string;
+  imageUrl?: string;
+  similarity?: number;
+  chunkIndex?: number;
+}
+
+/**
+ * Stream a multimodal chat response from Gemini 2.5 Flash (free tier).
  * Includes retry logic for rate limits.
+ *
+ * Key improvements:
+ * - Structured context with similarity scores and chunk indices
+ * - Generation config with high maxOutputTokens for detailed answers
+ * - Temperature tuned for factual, comprehensive responses
  */
 export async function streamChat(
   systemPrompt: string,
   userMessage: string,
-  contextChunks: { text: string; imageUrl?: string }[]
+  contextChunks: ContextChunk[]
 ) {
   const genAI = getClient();
   const model = genAI.getGenerativeModel({
     model: "gemini-2.5-flash",
     systemInstruction: systemPrompt,
+    generationConfig: {
+      maxOutputTokens: 8192,
+      temperature: 0.3,
+    },
   });
 
   // Build the content parts
   const parts: { text: string }[] = [];
 
-  // Add context chunks
+  // Add context chunks with structured formatting
   if (contextChunks.length > 0) {
-    let contextText = "## Retrieved Context:\n\n";
-    contextChunks.forEach((chunk, i) => {
-      contextText += `### Chunk ${i + 1}:\n${chunk.text}\n`;
+    let contextText = "## Retrieved Document Context\n\n";
+    contextText +=
+      `The following ${contextChunks.length} chunks were retrieved from the uploaded documents, ` +
+      `ordered by relevance (highest similarity first). Use ALL of this context to construct ` +
+      `your answer. Pay special attention to mathematical formulas, equations, and diagram descriptions.\n\n`;
+
+    // Sort by similarity (highest first) for better context presentation
+    const sorted = [...contextChunks].sort(
+      (a, b) => (b.similarity ?? 0) - (a.similarity ?? 0)
+    );
+
+    sorted.forEach((chunk, i) => {
+      const simLabel = chunk.similarity
+        ? ` (relevance: ${(chunk.similarity * 100).toFixed(1)}%)`
+        : "";
+      const idxLabel =
+        chunk.chunkIndex !== undefined
+          ? ` [Document Chunk #${chunk.chunkIndex}]`
+          : "";
+
+      contextText += `### Context Chunk ${i + 1}${simLabel}${idxLabel}\n\n`;
+      contextText += `${chunk.text}\n\n`;
+
       if (chunk.imageUrl) {
-        contextText += `[Associated Diagram: ${chunk.imageUrl}]\n`;
+        contextText += `📊 **Associated Diagram/Figure**: ${chunk.imageUrl}\n`;
+        contextText +=
+          `(Describe this diagram in detail based on the surrounding text context — ` +
+          `explain its components, axes, labels, data flow, and what it demonstrates.)\n\n`;
       }
-      contextText += "\n";
+
+      contextText += "---\n\n";
     });
+
     parts.push({ text: contextText });
   }
 
-  parts.push({ text: `## User Query:\n${userMessage}` });
+  parts.push({
+    text: `## User Question\n\n${userMessage}\n\n` +
+      `**Remember**: Provide a comprehensive, detailed answer using the context above. ` +
+      `Explain any mathematical formulas step-by-step. Describe any referenced diagrams thoroughly.`,
+  });
 
   // Retry with exponential backoff for rate limits
   for (let attempt = 0; attempt < 4; attempt++) {
