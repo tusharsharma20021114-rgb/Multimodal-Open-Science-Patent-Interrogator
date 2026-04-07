@@ -4,6 +4,8 @@ import { useState, useRef, useEffect } from "react";
 import { Send, Loader2, FileText, Bot, User, ImageIcon } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
 import { supabase } from "@/lib/supabase";
 
 interface Message {
@@ -130,17 +132,17 @@ export default function ChatPage() {
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 12,
+          gap: 10,
           paddingBottom: 8,
-          borderBottom: "1px solid var(--border-glass)",
+          borderBottom: "1px solid var(--border-subtle)",
         }}
       >
-        <FileText size={16} color="var(--text-secondary)" />
+        <FileText size={15} color="var(--text-muted)" />
         <select
           className="select-field"
           value={selectedDoc}
           onChange={(e) => setSelectedDoc(e.target.value)}
-          style={{ flex: 1, maxWidth: 400 }}
+          style={{ flex: 1, maxWidth: 360 }}
         >
           <option value="">All documents</option>
           {documents.map((doc) => (
@@ -162,17 +164,25 @@ export default function ChatPage() {
               flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
-              gap: 16,
-              opacity: 0.5,
+              gap: 12,
+              opacity: 0.4,
             }}
           >
-            <Bot size={48} />
-            <p style={{ fontSize: "1.1rem", fontWeight: 600 }}>
+            <Bot size={40} strokeWidth={1.5} />
+            <p style={{ fontSize: "1rem", fontWeight: 600 }}>
               Ask anything about your documents
             </p>
-            <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem" }}>
-              The RAG engine will search through your uploaded PDFs and provide
-              grounded answers with references.
+            <p
+              style={{
+                color: "var(--text-secondary)",
+                fontSize: "0.85rem",
+                maxWidth: 400,
+                textAlign: "center",
+                lineHeight: 1.5,
+              }}
+            >
+              The RAG engine searches through your uploaded PDFs and provides
+              grounded answers with mathematical detail and chunk references.
             </p>
           </div>
         )}
@@ -182,17 +192,21 @@ export default function ChatPage() {
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 8,
+                gap: 7,
                 marginBottom: 8,
-                fontSize: "0.8rem",
-                opacity: 0.7,
+                fontSize: "0.75rem",
+                opacity: 0.6,
+                fontWeight: 500,
               }}
             >
-              {msg.role === "user" ? <User size={14} /> : <Bot size={14} />}
+              {msg.role === "user" ? <User size={13} /> : <Bot size={13} />}
               {msg.role === "user" ? "You" : "RAG Engine"}
             </div>
             {msg.role === "assistant" ? (
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm, remarkMath]}
+                rehypePlugins={[rehypeKatex]}
+              >
                 {msg.content}
               </ReactMarkdown>
             ) : (
@@ -211,8 +225,8 @@ export default function ChatPage() {
                   <div
                     key={j}
                     style={{
-                      border: "1px solid var(--border-glass)",
-                      borderRadius: 8,
+                      border: "1px solid var(--border-subtle)",
+                      borderRadius: 10,
                       overflow: "hidden",
                       maxWidth: 200,
                     }}
@@ -220,11 +234,13 @@ export default function ChatPage() {
                     <div
                       style={{
                         padding: "4px 8px",
-                        background: "rgba(99,102,241,0.1)",
+                        background: "rgba(139,92,246,0.08)",
                         fontSize: "0.7rem",
                         display: "flex",
                         alignItems: "center",
                         gap: 4,
+                        fontWeight: 500,
+                        color: "var(--text-secondary)",
                       }}
                     >
                       <ImageIcon size={10} />
@@ -270,9 +286,13 @@ export default function ChatPage() {
           className="btn-primary"
           onClick={handleSend}
           disabled={loading || !input.trim()}
-          style={{ padding: "14px 18px" }}
+          style={{ padding: "13px 16px" }}
         >
-          {loading ? <Loader2 size={18} className="spinner" /> : <Send size={18} />}
+          {loading ? (
+            <Loader2 size={17} className="spinner" />
+          ) : (
+            <Send size={17} />
+          )}
         </button>
       </div>
     </div>
