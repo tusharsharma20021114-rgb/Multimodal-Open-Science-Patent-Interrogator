@@ -47,8 +47,6 @@ export default function DashboardPage() {
 
   function handleLogin(e: React.FormEvent) {
     e.preventDefault();
-    // Simple client-side check against env var
-    // In production, this would be a server-side check
     if (password === "admin123" || password.length > 0) {
       setAuthenticated(true);
       setAuthError(false);
@@ -71,15 +69,10 @@ export default function DashboardPage() {
   if (!authenticated) {
     return (
       <div className="auth-gate">
-        <div className="bg-mesh" />
-        <div className="glass-card auth-card" style={{ position: "relative", zIndex: 1 }}>
-          <Lock
-            size={40}
-            color="var(--accent-blue)"
-            style={{ margin: "0 auto 1rem" }}
-          />
-          <h2>Dashboard Access</h2>
-          <p>Enter the dashboard password to view analytics</p>
+        <div className="glass-card auth-card">
+          <Lock size={28} color="var(--accent)" style={{ margin: "0 auto 1rem" }} />
+          <h2>Dashboard</h2>
+          <p>Enter password to view analytics</p>
           <form onSubmit={handleLogin}>
             <input
               type="password"
@@ -90,19 +83,12 @@ export default function DashboardPage() {
               autoFocus
             />
             {authError && (
-              <p
-                style={{
-                  color: "var(--accent-rose)",
-                  fontSize: "0.85rem",
-                  marginBottom: 12,
-                }}
-              >
+              <p style={{ color: "var(--error)", fontSize: "0.82rem", marginBottom: 10 }}>
                 Invalid password
               </p>
             )}
             <button type="submit" className="btn-primary" style={{ width: "100%" }}>
-              <Lock size={16} />
-              Access Dashboard
+              Continue
             </button>
           </form>
         </div>
@@ -112,176 +98,98 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div
-        className="page-container"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          minHeight: "60vh",
-        }}
-      >
-        <div className="spinner" style={{ width: 32, height: 32, borderWidth: 3, color: "var(--accent-blue)" }} />
+      <div className="page-container" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
+        <div className="spinner" style={{ width: 28, height: 28, borderWidth: 2.5 }} />
       </div>
     );
   }
 
   const stats = [
-    {
-      label: "Documents",
-      value: data?.totals.documents || 0,
-      icon: FileText,
-      color: "#6366f1",
-      bg: "rgba(99,102,241,0.1)",
-    },
-    {
-      label: "Text Chunks",
-      value: data?.totals.chunks || 0,
-      icon: Layers,
-      color: "#06b6d4",
-      bg: "rgba(6,182,212,0.1)",
-    },
-    {
-      label: "Total Queries",
-      value: data?.totals.queries || 0,
-      icon: Search,
-      color: "#8b5cf6",
-      bg: "rgba(139,92,246,0.1)",
-    },
-    {
-      label: "Diagrams Extracted",
-      value: data?.totals.diagrams || 0,
-      icon: ImageIcon,
-      color: "#10b981",
-      bg: "rgba(16,185,129,0.1)",
-    },
+    { label: "Documents", value: data?.totals.documents || 0, icon: FileText, color: "#0D9488", bg: "rgba(13,148,136,0.06)" },
+    { label: "Text chunks", value: data?.totals.chunks || 0, icon: Layers, color: "#2563EB", bg: "rgba(37,99,235,0.06)" },
+    { label: "Queries", value: data?.totals.queries || 0, icon: Search, color: "#CA8A04", bg: "rgba(202,138,4,0.06)" },
+    { label: "Diagrams", value: data?.totals.diagrams || 0, icon: ImageIcon, color: "#E11D48", bg: "rgba(225,29,72,0.05)" },
   ];
 
   return (
     <div className="page-container">
       <div className="page-header">
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <BarChart3 size={28} color="var(--accent-blue)" />
-          <div>
-            <h1 className="page-title">System Dashboard</h1>
-            <p className="page-subtitle">
-              Real-time telemetry and operational metrics
-            </p>
-          </div>
-        </div>
+        <h1 className="page-title">Dashboard</h1>
+        <p className="page-subtitle">System metrics and document analytics</p>
       </div>
 
-      {/* KPI Cards */}
+      {/* Stats */}
       <div className="dashboard-grid">
         {stats.map((stat) => (
           <div key={stat.label} className="glass-card stat-card">
-            <div
-              className="stat-icon"
-              style={{ background: stat.bg, color: stat.color }}
-            >
-              <stat.icon size={22} />
+            <div className="stat-icon" style={{ background: stat.bg, color: stat.color }}>
+              <stat.icon size={18} />
             </div>
-            <div className="stat-value" style={{ color: stat.color }}>
-              {stat.value.toLocaleString()}
-            </div>
+            <div className="stat-value">{stat.value.toLocaleString()}</div>
             <div className="stat-label">{stat.label}</div>
           </div>
         ))}
       </div>
 
-      {/* Query Time Series */}
+      {/* Chart */}
       <div className="glass-card chart-container">
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            marginBottom: "1rem",
-          }}
-        >
-          <TrendingUp size={18} color="var(--accent-blue)" />
-          <span className="chart-title" style={{ marginBottom: 0 }}>
-            Query Volume (Last 30 Days)
-          </span>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: "1rem" }}>
+          <TrendingUp size={15} color="var(--accent)" />
+          <span className="chart-title" style={{ marginBottom: 0 }}>Query volume (30 days)</span>
         </div>
         {data?.queryTimeSeries && data.queryTimeSeries.length > 0 ? (
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={260}>
             <AreaChart data={data.queryTimeSeries}>
               <defs>
                 <linearGradient id="colorQueries" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                  <stop offset="5%" stopColor="#0D9488" stopOpacity={0.15} />
+                  <stop offset="95%" stopColor="#0D9488" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid
-                strokeDasharray="3 3"
-                stroke="rgba(100,120,255,0.1)"
-              />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
               <XAxis
                 dataKey="date"
                 stroke="var(--text-muted)"
-                fontSize={12}
+                fontSize={11}
                 tickFormatter={(d) =>
-                  new Date(d).toLocaleDateString("en", {
-                    month: "short",
-                    day: "numeric",
-                  })
+                  new Date(d).toLocaleDateString("en", { month: "short", day: "numeric" })
                 }
               />
-              <YAxis stroke="var(--text-muted)" fontSize={12} />
+              <YAxis stroke="var(--text-muted)" fontSize={11} />
               <Tooltip
                 contentStyle={{
-                  background: "var(--bg-card)",
-                  border: "1px solid var(--border-glass)",
-                  borderRadius: 10,
+                  background: "var(--bg-surface)",
+                  border: "1px solid var(--border-light)",
+                  borderRadius: 8,
                   color: "var(--text-primary)",
-                  fontSize: "0.85rem",
+                  fontSize: "0.82rem",
+                  boxShadow: "var(--shadow-md)",
                 }}
               />
               <Area
                 type="monotone"
                 dataKey="queries"
-                stroke="#6366f1"
+                stroke="#0D9488"
                 fill="url(#colorQueries)"
-                strokeWidth={2}
+                strokeWidth={1.5}
               />
             </AreaChart>
           </ResponsiveContainer>
         ) : (
-          <div
-            style={{
-              height: 200,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "var(--text-muted)",
-            }}
-          >
+          <div style={{ height: 180, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)" }}>
             <div style={{ textAlign: "center" }}>
-              <Activity
-                size={32}
-                style={{ marginBottom: 8, opacity: 0.4 }}
-              />
-              <p>No query data yet — start asking questions!</p>
+              <Activity size={24} style={{ marginBottom: 6, opacity: 0.4 }} />
+              <p style={{ fontSize: "0.88rem" }}>No query data yet</p>
             </div>
           </div>
         )}
       </div>
 
-      {/* Recent Documents Table */}
+      {/* Table */}
       <div className="glass-card chart-container">
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            marginBottom: "1rem",
-          }}
-        >
-          <FileText size={18} color="var(--accent-cyan)" />
-          <span className="chart-title" style={{ marginBottom: 0 }}>
-            Recent Documents
-          </span>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: "1rem" }}>
+          <FileText size={15} color="var(--accent)" />
+          <span className="chart-title" style={{ marginBottom: 0 }}>Recent documents</span>
         </div>
         {data?.recentDocuments && data.recentDocuments.length > 0 ? (
           <div style={{ overflowX: "auto" }}>
@@ -297,20 +205,18 @@ export default function DashboardPage() {
               <tbody>
                 {data.recentDocuments.map((doc) => (
                   <tr key={doc.id}>
-                    <td style={{ fontWeight: 600 }}>{doc.title}</td>
+                    <td style={{ fontWeight: 600, color: "var(--text-primary)" }}>{doc.title}</td>
                     <td>{doc.total_chunks}</td>
                     <td>{doc.diagrams_extracted || 0}</td>
-                    <td style={{ color: "var(--text-secondary)" }}>
-                      {new Date(doc.upload_date).toLocaleDateString()}
-                    </td>
+                    <td>{new Date(doc.upload_date).toLocaleDateString()}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         ) : (
-          <p style={{ color: "var(--text-muted)", textAlign: "center", padding: "2rem 0" }}>
-            No documents uploaded yet
+          <p style={{ color: "var(--text-muted)", textAlign: "center", padding: "1.5rem 0", fontSize: "0.88rem" }}>
+            No documents yet
           </p>
         )}
       </div>

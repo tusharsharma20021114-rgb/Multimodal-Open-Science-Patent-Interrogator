@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Brain,
+  Home,
   Upload,
   MessageSquare,
   BarChart3,
@@ -13,7 +13,7 @@ export default function NavBar() {
   const pathname = usePathname();
 
   const links = [
-    { href: "/", label: "Home", icon: Brain },
+    { href: "/", label: "Home", icon: Home },
     { href: "/upload", label: "Upload", icon: Upload },
     { href: "/chat", label: "Chat", icon: MessageSquare },
     { href: "/dashboard", label: "Dashboard", icon: BarChart3 },
@@ -23,7 +23,9 @@ export default function NavBar() {
     <nav className="nav-bar">
       <Link href="/" className="nav-logo">
         <div className="nav-logo-icon">
-          <Brain size={20} color="white" />
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+          </svg>
         </div>
         RAG Engine
       </Link>
@@ -34,7 +36,7 @@ export default function NavBar() {
               href={link.href}
               className={`nav-link ${pathname === link.href ? "active" : ""}`}
             >
-              <link.icon size={16} />
+              <link.icon size={14} strokeWidth={2} />
               {link.label}
             </Link>
           </li>

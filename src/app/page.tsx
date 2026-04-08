@@ -2,136 +2,127 @@ import Link from "next/link";
 import {
   Upload,
   MessageSquare,
-  BarChart3,
+  Layers,
   Eye,
-  Cpu,
-  Database,
+  Search,
   Zap,
-  Sparkles,
 } from "lucide-react";
 
 export default function HomePage() {
   return (
     <>
-      {/* Hero Section */}
+      {/* Hero */}
       <section className="hero">
         <div className="hero-content">
-          <div className="hero-badge">
-            <Sparkles size={13} />
-            Powered by Gemini AI — Free Tier
-          </div>
+          <div className="hero-badge">Open Source · Free Tier</div>
           <h1>
-            Multimodal{" "}
-            <span className="gradient-text">RAG Engine</span>
+            Research paper
             <br />
-            for Science & Patents
+            <span className="gradient-text">interrogation</span>,
+            <br />
+            made simple.
           </h1>
           <p>
-            Upload scientific papers, automatically extract diagrams with
-            in-browser AI vision, and interrogate your documents with a
-            retrieval-augmented generation pipeline.
+            Upload any scientific paper or patent. We extract text, detect
+            diagrams, and let you have a deep conversation with your documents
+            — equations, methods, and all.
           </p>
           <div className="hero-actions">
             <Link href="/upload" className="btn-primary">
-              <Upload size={17} />
-              Upload Document
+              <Upload size={15} />
+              Upload a paper
             </Link>
             <Link href="/chat" className="btn-secondary">
-              <MessageSquare size={17} />
-              Start Chat
+              <MessageSquare size={15} />
+              Start chatting
             </Link>
           </div>
         </div>
       </section>
 
-      {/* Features Grid */}
+      {/* Features — Notion-style 1px-bordered grid */}
       <section className="features-grid">
-        <div className="glass-card feature-card">
+        <div className="feature-card">
           <div
             className="feature-icon"
-            style={{ background: "rgba(139, 92, 246, 0.1)", color: "#a78bfa" }}
+            style={{ background: "rgba(13, 148, 136, 0.08)", color: "#0D9488" }}
           >
-            <Upload size={22} />
+            <Upload size={18} />
           </div>
-          <h3 className="feature-title">Smart PDF Ingestion</h3>
+          <h3 className="feature-title">PDF ingestion</h3>
           <p className="feature-desc">
-            Upload any PDF. The engine extracts text, splits it into
-            math-aware contextual chunks with overlap, and generates vector
-            embeddings for semantic search.
+            Drop a PDF. Text is extracted, split into math-aware chunks with
+            overlap, and embedded as vectors for semantic search.
           </p>
         </div>
 
-        <div className="glass-card feature-card">
+        <div className="feature-card">
           <div
             className="feature-icon"
-            style={{ background: "rgba(20, 184, 166, 0.1)", color: "#5eead4" }}
+            style={{ background: "rgba(202, 138, 4, 0.08)", color: "#CA8A04" }}
           >
-            <Eye size={22} />
+            <Eye size={18} />
           </div>
-          <h3 className="feature-title">Browser AI Vision</h3>
+          <h3 className="feature-title">Diagram detection</h3>
           <p className="feature-desc">
-            DETR object detection runs in your browser via Transformers.js.
-            Diagrams, charts, and figures are automatically detected and
-            cropped — zero server cost.
+            DETR runs in your browser. Figures, charts, and tables are
+            detected and cropped automatically — no server needed.
           </p>
         </div>
 
-        <div className="glass-card feature-card">
+        <div className="feature-card">
           <div
             className="feature-icon"
-            style={{ background: "rgba(59, 130, 246, 0.1)", color: "#93c5fd" }}
+            style={{ background: "rgba(225, 29, 72, 0.06)", color: "#E11D48" }}
           >
-            <Cpu size={22} />
+            <Search size={18} />
           </div>
-          <h3 className="feature-title">Multimodal RAG Chat</h3>
+          <h3 className="feature-title">Semantic search</h3>
           <p className="feature-desc">
-            Ask questions about your documents. The engine retrieves relevant
-            chunks with similarity scores and generates detailed streaming
-            responses with Gemini.
+            pgvector with HNSW indexing. Ask a question, and the most
+            relevant chunks surface instantly via cosine similarity.
           </p>
         </div>
 
-        <div className="glass-card feature-card">
+        <div className="feature-card">
           <div
             className="feature-icon"
-            style={{ background: "rgba(16, 185, 129, 0.1)", color: "#6ee7b7" }}
+            style={{ background: "rgba(37, 99, 235, 0.06)", color: "#2563EB" }}
           >
-            <Database size={22} />
+            <MessageSquare size={18} />
           </div>
-          <h3 className="feature-title">Vector Database</h3>
+          <h3 className="feature-title">RAG conversations</h3>
           <p className="feature-desc">
-            Supabase PostgreSQL with pgvector. HNSW indexing enables
-            blazing-fast cosine similarity search across all your document
-            embeddings.
+            Gemini generates detailed answers grounded in your paper — with
+            equations explained step-by-step and chunk citations.
           </p>
         </div>
 
-        <div className="glass-card feature-card">
+        <div className="feature-card">
           <div
             className="feature-icon"
-            style={{ background: "rgba(245, 158, 11, 0.1)", color: "#fcd34d" }}
+            style={{ background: "rgba(13, 148, 136, 0.08)", color: "#0D9488" }}
           >
-            <BarChart3 size={22} />
+            <Layers size={18} />
           </div>
-          <h3 className="feature-title">Analytics Dashboard</h3>
+          <h3 className="feature-title">Math-aware chunking</h3>
           <p className="feature-desc">
-            Monitor real-time metrics: document count, embedding coverage,
-            query volume, and extraction statistics — visualized with
-            interactive charts.
+            LaTeX blocks, equations, and figure captions are never split.
+            Chunks respect section boundaries for coherent retrieval.
           </p>
         </div>
 
-        <div className="glass-card feature-card">
+        <div className="feature-card">
           <div
             className="feature-icon"
-            style={{ background: "rgba(244, 63, 94, 0.1)", color: "#fda4af" }}
+            style={{ background: "rgba(202, 138, 4, 0.08)", color: "#CA8A04" }}
           >
-            <Zap size={22} />
+            <Zap size={18} />
           </div>
-          <h3 className="feature-title">Zero-Cost Stack</h3>
+          <h3 className="feature-title">Completely free</h3>
           <p className="feature-desc">
-            Deploys on Vercel free tier. Supabase free for database and
-            storage, Gemini free for AI — fully operational at zero cost.
+            Vercel, Supabase, and Gemini free tiers. A fully functional
+            research assistant at zero cost.
           </p>
         </div>
       </section>

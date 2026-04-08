@@ -8,7 +8,6 @@ import {
   CheckCircle,
   AlertCircle,
   Loader2,
-  Eye,
   Trash2,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -60,14 +59,14 @@ export default function UploadPage() {
 
     setUploading(true);
     setProgress(10);
-    setStatusMsg("Uploading PDF to storage...");
+    setStatusMsg("Uploading...");
 
     try {
       const formData = new FormData();
       formData.append("file", file);
 
       setProgress(30);
-      setStatusMsg("Extracting text and generating embeddings...");
+      setStatusMsg("Extracting text & generating embeddings...");
 
       const res = await fetch("/api/upload-document", {
         method: "POST",
@@ -83,10 +82,10 @@ export default function UploadPage() {
 
       const data = await res.json();
       setProgress(100);
-      setStatusMsg("Processing complete!");
+      setStatusMsg("Done!");
       setToast({
         type: "success",
-        msg: `"${data.title}" uploaded — ${data.chunks} chunks created from ${data.pages} pages`,
+        msg: `"${data.title}" — ${data.chunks} chunks from ${data.pages} pages`,
       });
       loadDocuments();
     } catch (err: unknown) {
@@ -118,10 +117,9 @@ export default function UploadPage() {
   return (
     <div className="page-container">
       <div className="page-header">
-        <h1 className="page-title">Upload Documents</h1>
+        <h1 className="page-title">Upload</h1>
         <p className="page-subtitle">
-          Upload PDF documents to extract text, generate embeddings, and detect
-          diagrams
+          Drop a PDF to extract text, generate embeddings, and detect diagrams.
         </p>
       </div>
 
@@ -135,31 +133,29 @@ export default function UploadPage() {
         {uploading ? (
           <>
             <Loader2
-              size={48}
-              style={{ margin: "0 auto 1rem", animation: "spin 1s linear infinite" }}
-              color="var(--accent-blue)"
+              size={32}
+              style={{ margin: "0 auto 0.75rem", animation: "spin 1s linear infinite" }}
+              color="var(--accent)"
             />
-            <p style={{ color: "var(--text-primary)", fontWeight: 600 }}>
+            <p style={{ color: "var(--text-primary)", fontWeight: 600, fontSize: "0.92rem" }}>
               {statusMsg}
             </p>
-            <div className="progress-bar" style={{ maxWidth: 400, margin: "1rem auto 0" }}>
+            <div className="progress-bar" style={{ maxWidth: 320, margin: "0.75rem auto 0" }}>
               <div className="progress-fill" style={{ width: `${progress}%` }} />
             </div>
           </>
         ) : (
           <>
             <Upload
-              size={48}
-              style={{ margin: "0 auto 1rem", opacity: 0.5 }}
-              color="var(--accent-blue)"
+              size={28}
+              style={{ margin: "0 auto 0.75rem", opacity: 0.4 }}
+              color="var(--text-secondary)"
             />
-            <p style={{ color: "var(--text-primary)", fontWeight: 600, marginBottom: 8 }}>
-              {isDragActive
-                ? "Drop your PDF here..."
-                : "Drag & drop a PDF file here"}
+            <p style={{ color: "var(--text-primary)", fontWeight: 600, fontSize: "0.92rem", marginBottom: 4 }}>
+              {isDragActive ? "Drop it here..." : "Drag & drop a PDF"}
             </p>
-            <p style={{ color: "var(--text-secondary)", fontSize: "0.85rem" }}>
-              or click to browse — supports any PDF document
+            <p style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}>
+              or click to browse
             </p>
           </>
         )}
@@ -168,31 +164,26 @@ export default function UploadPage() {
       {/* Document List */}
       {documents.length > 0 && (
         <div style={{ marginTop: "2rem" }}>
-          <h2 style={{ fontSize: "1.25rem", fontWeight: 700, marginBottom: "1rem" }}>
-            Uploaded Documents
+          <h2 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "0.75rem", letterSpacing: "-0.01em" }}>
+            Documents
           </h2>
-          <div className="doc-list">
+          <div className="doc-list" style={{ border: "1px solid var(--border-light)", borderRadius: "var(--radius)" }}>
             {documents.map((doc) => (
-              <div key={doc.id} className="glass-card doc-item">
+              <div key={doc.id} className="doc-item">
                 <div className="doc-item-info">
                   <div className="doc-item-icon">
-                    <FileText size={20} />
+                    <FileText size={16} />
                   </div>
                   <div className="doc-item-meta">
                     <span className="doc-item-title">{doc.title}</span>
                     <span className="doc-item-subtitle">
-                      {doc.total_chunks} chunks •{" "}
-                      {doc.diagrams_extracted || 0} diagrams •{" "}
-                      {new Date(doc.upload_date).toLocaleDateString()}
+                      {doc.total_chunks} chunks · {doc.diagrams_extracted || 0} diagrams · {new Date(doc.upload_date).toLocaleDateString()}
                     </span>
                   </div>
                 </div>
-                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                   <span className="doc-item-badge">
-                    <CheckCircle
-                      size={12}
-                      style={{ display: "inline", verticalAlign: "middle", marginRight: 4 }}
-                    />
+                    <CheckCircle size={10} style={{ display: "inline", verticalAlign: "middle", marginRight: 3 }} />
                     Indexed
                   </span>
                   <button
@@ -201,18 +192,18 @@ export default function UploadPage() {
                       deleteDoc(doc.id);
                     }}
                     style={{
-                      background: "rgba(244,63,94,0.1)",
-                      border: "1px solid rgba(244,63,94,0.2)",
-                      borderRadius: 8,
-                      padding: "6px 8px",
+                      background: "var(--error-light)",
+                      border: "1px solid rgba(220,38,38,0.1)",
+                      borderRadius: 6,
+                      padding: "5px 6px",
                       cursor: "pointer",
-                      color: "var(--accent-rose)",
+                      color: "var(--error)",
                       display: "flex",
                       alignItems: "center",
                     }}
-                    title="Delete document"
+                    title="Delete"
                   >
-                    <Trash2 size={14} />
+                    <Trash2 size={13} />
                   </button>
                 </div>
               </div>
@@ -223,11 +214,7 @@ export default function UploadPage() {
 
       {toast && (
         <div className={`toast ${toast.type}`}>
-          {toast.type === "success" ? (
-            <CheckCircle size={16} />
-          ) : (
-            <AlertCircle size={16} />
-          )}
+          {toast.type === "success" ? <CheckCircle size={14} /> : <AlertCircle size={14} />}
           {toast.msg}
         </div>
       )}

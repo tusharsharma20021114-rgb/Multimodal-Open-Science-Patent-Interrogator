@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Send, Loader2, FileText, Bot, User, ImageIcon } from "lucide-react";
+import { Send, Loader2, FileText, ImageIcon } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -60,9 +60,7 @@ export default function ChatPage() {
         }),
       });
 
-      if (!res.ok) {
-        throw new Error("Failed to get response");
-      }
+      if (!res.ok) throw new Error("Failed to get response");
 
       const reader = res.body?.getReader();
       if (!reader) throw new Error("No stream");
@@ -70,7 +68,6 @@ export default function ChatPage() {
       const decoder = new TextDecoder();
       let fullText = "";
 
-      // Add empty assistant message
       setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
 
       while (true) {
@@ -80,7 +77,6 @@ export default function ChatPage() {
         const chunk = decoder.decode(value, { stream: true });
         fullText += chunk;
 
-        // Parse out metadata if present
         const metaMatch = fullText.match(/<!--META:(.+?)-->/);
         const displayText = fullText.replace(/\n<!--META:.+?-->/, "");
 
@@ -92,12 +88,8 @@ export default function ChatPage() {
             if (metaMatch) {
               try {
                 const meta = JSON.parse(metaMatch[1]);
-                if (meta.images?.length) {
-                  last.images = meta.images;
-                }
-              } catch {
-                // ignore parse errors
-              }
+                if (meta.images?.length) last.images = meta.images;
+              } catch { /* ignore */ }
             }
           }
           return [...updated];
@@ -108,8 +100,7 @@ export default function ChatPage() {
         ...prev,
         {
           role: "assistant",
-          content:
-            "Sorry, I encountered an error. Please check that your API keys are configured and try again.",
+          content: "Sorry, something went wrong. Check your API keys and try again.",
         },
       ]);
     } finally {
@@ -127,22 +118,22 @@ export default function ChatPage() {
 
   return (
     <div className="chat-container">
-      {/* Document Selector */}
+      {/* Document selector — minimal */}
       <div
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 10,
+          gap: 8,
           paddingBottom: 8,
-          borderBottom: "1px solid var(--border-subtle)",
+          borderBottom: "1px solid var(--border-light)",
         }}
       >
-        <FileText size={15} color="var(--text-muted)" />
+        <FileText size={14} color="var(--text-muted)" />
         <select
           className="select-field"
           value={selectedDoc}
           onChange={(e) => setSelectedDoc(e.target.value)}
-          style={{ flex: 1, maxWidth: 360 }}
+          style={{ flex: 1, maxWidth: 320 }}
         >
           <option value="">All documents</option>
           {documents.map((doc) => (
@@ -151,7 +142,7 @@ export default function ChatPage() {
             </option>
           ))}
         </select>
-        <div className="pulse-dot" title="System active" />
+        <div className="pulse-dot" title="Connected" />
       </div>
 
       {/* Messages */}
@@ -164,44 +155,36 @@ export default function ChatPage() {
               flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
-              gap: 12,
-              opacity: 0.4,
+              gap: 8,
             }}
           >
-            <Bot size={40} strokeWidth={1.5} />
-            <p style={{ fontSize: "1rem", fontWeight: 600 }}>
-              Ask anything about your documents
+            <p
+              style={{
+                fontSize: "1.5rem",
+                fontWeight: 800,
+                letterSpacing: "-0.03em",
+                color: "var(--text-primary)",
+              }}
+            >
+              Ask your paper anything
             </p>
             <p
               style={{
-                color: "var(--text-secondary)",
-                fontSize: "0.85rem",
-                maxWidth: 400,
+                color: "var(--text-muted)",
+                fontSize: "0.88rem",
+                maxWidth: 380,
                 textAlign: "center",
                 lineHeight: 1.5,
               }}
             >
-              The RAG engine searches through your uploaded PDFs and provides
-              grounded answers with mathematical detail and chunk references.
+              Select a document above, then ask about its methods, equations,
+              results, or diagrams.
             </p>
           </div>
         )}
+
         {messages.map((msg, i) => (
           <div key={i} className={`message-bubble ${msg.role}`}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 7,
-                marginBottom: 8,
-                fontSize: "0.75rem",
-                opacity: 0.6,
-                fontWeight: 500,
-              }}
-            >
-              {msg.role === "user" ? <User size={13} /> : <Bot size={13} />}
-              {msg.role === "user" ? "You" : "RAG Engine"}
-            </div>
             {msg.role === "assistant" ? (
               <ReactMarkdown
                 remarkPlugins={[remarkGfm, remarkMath]}
@@ -210,54 +193,44 @@ export default function ChatPage() {
                 {msg.content}
               </ReactMarkdown>
             ) : (
-              <p>{msg.content}</p>
+              msg.content
             )}
             {msg.images && msg.images.length > 0 && (
-              <div
-                style={{
-                  marginTop: 12,
-                  display: "flex",
-                  gap: 8,
-                  flexWrap: "wrap",
-                }}
-              >
+              <div style={{ marginTop: 10, display: "flex", gap: 6, flexWrap: "wrap" }}>
                 {msg.images.map((url, j) => (
                   <div
                     key={j}
                     style={{
-                      border: "1px solid var(--border-subtle)",
-                      borderRadius: 10,
+                      border: "1px solid var(--border-light)",
+                      borderRadius: 8,
                       overflow: "hidden",
-                      maxWidth: 200,
+                      maxWidth: 180,
                     }}
                   >
                     <div
                       style={{
-                        padding: "4px 8px",
-                        background: "rgba(139,92,246,0.08)",
+                        padding: "3px 6px",
+                        background: "var(--bg-muted)",
                         fontSize: "0.7rem",
                         display: "flex",
                         alignItems: "center",
-                        gap: 4,
+                        gap: 3,
+                        color: "var(--text-muted)",
                         fontWeight: 500,
-                        color: "var(--text-secondary)",
                       }}
                     >
-                      <ImageIcon size={10} />
-                      Referenced Diagram
+                      <ImageIcon size={9} />
+                      Diagram
                     </div>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={url}
-                      alt={`Diagram ${j + 1}`}
-                      style={{ width: "100%", display: "block" }}
-                    />
+                    <img src={url} alt={`Diagram ${j + 1}`} style={{ width: "100%", display: "block" }} />
                   </div>
                 ))}
               </div>
             )}
           </div>
         ))}
+
         {loading && (
           <div className="message-bubble assistant">
             <div className="typing-indicator">
@@ -275,7 +248,7 @@ export default function ChatPage() {
         <textarea
           ref={inputRef}
           className="chat-input"
-          placeholder="Ask a question about your documents..."
+          placeholder="Ask a question..."
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -286,13 +259,9 @@ export default function ChatPage() {
           className="btn-primary"
           onClick={handleSend}
           disabled={loading || !input.trim()}
-          style={{ padding: "13px 16px" }}
+          style={{ padding: "11px 14px" }}
         >
-          {loading ? (
-            <Loader2 size={17} className="spinner" />
-          ) : (
-            <Send size={17} />
-          )}
+          {loading ? <Loader2 size={16} className="spinner" /> : <Send size={16} />}
         </button>
       </div>
     </div>
