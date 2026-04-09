@@ -55,31 +55,78 @@ export async function POST(request: NextRequest) {
       .from("document-assets")
       .getPublicUrl(`pdfs/${userId}/${fileName}`);
 
-    // 2. Parse PDF text
-    // @ts-expect-error - Next.js server-side dynamic import workaround
-    const pdfParseModule = await import("pdf-parse/lib/pdf-parse.js");
-    const pdfParse = pdfParseModule.default || pdfParseModule;
-    const pdfData = await pdfParse(buffer);
-    const rawText = pdfData.text;
+    // 2. Parse PDF text & Diagrams
+    let rawText = "";
+    let diagramCount = 0;
+    let diagramsToInsert: any[] = [];
+    const numPages = 1; // Default fallback
 
-    if (!rawText || rawText.trim().length === 0) {
-      return NextResponse.json(
-        { error: "Could not extract text from PDF" },
-        { status: 422 }
-      );
+    const unstructuredKey = process.env.UNSTRUCTURED_API_KEY;
+
+    if (unstructuredKey && unstructuredKey.trim().length > 0) {
+      try {
+        const unstrFormData = new FormData();
+        unstrFormData.append("files", file);
+        unstrFormData.append("strategy", "hi_res");
+        unstrFormData.append("extract_image_block_types", '["Image", "Table"]');
+
+        const unstrRes = await fetch("https://api.unstructuredapp.io/general/v0/general", {
+          method: "POST",
+          headers: {
+            "unstructured-api-key": unstructuredKey,
+            accept: "application/json",
+          },
+          body: unstrFormData,
+        });
+
+        if (!unstrRes.ok) {
+          throw new Error(`Unstructured API failed: ${await unstrRes.text()}`);
+        }
+
+        const elements = await unstrRes.json();
+        for (const el of elements) {
+          if (["Title", "NarrativeText", "ListItem", "Text"].includes(el.type)) {
+            rawText += el.text + "\n\n";
+          }
+          if (["Image", "Table", "Figure"].includes(el.type) && el.metadata?.image_base64) {
+             diagramCount++;
+             const pageNum = el.metadata.page_number || 1;
+             const imgBuffer = Buffer.from(el.metadata.image_base64, "base64");
+             const imgFileName = `pdfs/${userId}/${fileName.replace(".pdf", "")}_diagram_${diagramCount}.png`;
+
+             const { error: upErr } = await serviceSupabase.storage
+               .from("document-assets")
+               .upload(imgFileName, imgBuffer, { contentType: "image/png" });
+
+             if (!upErr) {
+               const { data: { publicUrl: imgUrl } } = serviceSupabase.storage.from("document-assets").getPublicUrl(imgFileName);
+               diagramsToInsert.push({
+                 user_id: userId,
+                 page_number: pageNum,
+                 image_url: imgUrl,
+                 label: `${el.type} ${diagramCount}`
+               });
+             }
+          }
+        }
+      } catch (err) {
+        console.error("Unstructured API error, falling back to pdf-parse.", err);
+      }
+    }
+
+    if (!rawText.trim()) {
+      // Fallback
+      // @ts-expect-error - Next.js server-side dynamic import workaround
+      const pdfParseModule = await import("pdf-parse/lib/pdf-parse.js");
+      const pdfParse = pdfParseModule.default || pdfParseModule;
+      const pdfData = await pdfParse(buffer);
+      rawText = pdfData.text;
+
+      const figureMatches = rawText.match(/(?:Fig(?:ure)?\.?\s*\d+|TABLE\s+[IVX\d]+)/gi);
+      diagramCount = new Set((figureMatches || []).map((m: string) => m.replace(/\s+/g, " ").toLowerCase())).size;
     }
 
     const chunks = chunkText(rawText, 1000, 200);
-
-    const figureMatches = rawText.match(
-      /(?:Fig(?:ure)?\.?\s*\d+|TABLE\s+[IVX\d]+)/gi
-    );
-    const uniqueFigures = new Set(
-      (figureMatches || []).map((m: string) =>
-        m.replace(/\s+/g, " ").toLowerCase()
-      )
-    );
-    const diagramCount = uniqueFigures.size;
 
     const { data: doc, error: docError } = await serviceSupabase
       .from("documents")
@@ -104,6 +151,12 @@ export async function POST(request: NextRequest) {
         { error: "Failed to create document record" },
         { status: 500 }
       );
+    }
+
+    if (diagramsToInsert.length > 0) {
+      const dbDiagrams = diagramsToInsert.map(d => ({ ...d, document_id: doc.id }));
+      const { error: diagramErr } = await serviceSupabase.from("diagrams").insert(dbDiagrams);
+      if (diagramErr) console.error("Diagram insert error:", diagramErr);
     }
 
     const embeddings = await generateEmbeddingsBatched(
