@@ -1,14 +1,14 @@
-import { NextRequest } from "next/server";
-import { getServiceSupabase } from "@/lib/supabase";
-import { generateEmbedding, streamChat } from "@/lib/gemini";
-import type { ContextChunk } from "@/lib/gemini";
-
-export const maxDuration = 30;
+import { NextRequest, NextResponse } from "next/server";
+import { createClient, createServiceClient } from "@/lib/supabase";
+import { searchDocuments } from "@/lib/rag";
+import { streamChat } from "@/lib/gemini";
+import { chatSchema } from "@/lib/validations";
+import type { ContextChunk } from "@/types";
 
 const SYSTEM_PROMPT = `You are an expert technical analyst and research assistant for the Multimodal Open-Science & Patent Interrogator system.
 
 ## Your Core Mission
-You provide **comprehensive, detailed, and thorough** answers grounded entirely in the retrieved document context. Your answers should be as detailed as a graduate-level textbook explanation.
+You provide **comprehensive, detailed and thorough** answers grounded entirely in the retrieved document context. Your answers should be as detailed as a graduate-level textbook explanation.
 
 ## Response Guidelines
 
@@ -47,67 +47,44 @@ You provide **comprehensive, detailed, and thorough** answers grounded entirely 
 - If only partial information is available, provide what you can and note the gaps
 - Distinguish between what the document states vs. your interpretation`;
 
+export const maxDuration = 60;
+
 export async function POST(request: NextRequest) {
   try {
-    const { query, documentId } = await request.json();
+    const body = await request.json();
+    const { query, documentId } = chatSchema.parse(body);
 
-    if (!query || typeof query !== "string") {
-      return new Response(JSON.stringify({ error: "Query is required" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
+    const supabaseClient = await createClient();
+    const serviceSupabase = createServiceClient();
+
+    const {
+      data: { user },
+    } = await supabaseClient.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const supabase = getServiceSupabase();
+    const userId = user.id;
 
-    // 1. Generate embedding for the query
-    const queryEmbedding = await generateEmbedding(query);
-
-    // 2. Perform similarity search via RPC — retrieve MORE chunks for richer context
-    const { data: chunks, error: searchError } = await supabase.rpc(
-      "match_document_chunks",
-      {
-        query_embedding: JSON.stringify(queryEmbedding),
-        match_threshold: 0.2,   // Lowered from 0.3 to capture more marginally relevant chunks
-        match_count: 15,        // Increased from 5 to 15 for much richer context
-        filter_document_id: documentId || null,
-      }
+    const contextChunks = await searchDocuments(
+      query,
+      userId,
+      serviceSupabase,
+      documentId ?? undefined
     );
 
-    if (searchError) {
-      console.error("Search error:", searchError);
-      return new Response(
-        JSON.stringify({ error: "Failed to search documents" }),
-        { status: 500, headers: { "Content-Type": "application/json" } }
-      );
-    }
-
-    // Build context chunks with similarity scores and chunk indices
-    const contextChunks: ContextChunk[] = (chunks || []).map(
-      (c: {
-        text_content: string;
-        image_url: string | null;
-        similarity: number;
-        chunk_index: number;
-      }) => ({
-        text: c.text_content,
-        imageUrl: c.image_url || undefined,
-        similarity: c.similarity,
-        chunkIndex: c.chunk_index,
-      })
-    );
-
-    // If no chunks found, return a helpful message instead of hallucinating
     if (contextChunks.length === 0) {
-      await supabase.from("query_logs").insert({
+      await serviceSupabase.from("query_logs").insert({
+        user_id: userId,
         query,
         chunks_retrieved: 0,
         document_id: documentId || null,
       });
 
       const noContextMsg = documentId
-        ? "I couldn't find any relevant content in this document for your query. This may happen if the document hasn't been fully processed yet. Please try re-uploading the document or selecting 'All documents'."
-        : "I couldn't find any relevant content across your documents for this query. Please make sure you've uploaded documents first.";
+        ? "I couldn't find any relevant content in this document for your query. Please try re-uploading the document or selecting 'All documents'."
+        : "I couldn't find any relevant content across your documents. Please make sure you've uploaded documents first.";
 
       return new Response(noContextMsg, {
         headers: {
@@ -117,17 +94,15 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 3. Log query for analytics
-    await supabase.from("query_logs").insert({
+    await serviceSupabase.from("query_logs").insert({
+      user_id: userId,
       query,
       chunks_retrieved: contextChunks.length,
       document_id: documentId || null,
     });
 
-    // 4. Stream response from Gemini with enriched context
     const stream = await streamChat(SYSTEM_PROMPT, query, contextChunks);
 
-    // Convert to ReadableStream for the response
     const encoder = new TextEncoder();
     const readable = new ReadableStream({
       async start(controller) {
@@ -138,19 +113,20 @@ export async function POST(request: NextRequest) {
               controller.enqueue(encoder.encode(text));
             }
           }
-          // Send metadata at the end
           const metadata = JSON.stringify({
             _meta: true,
             chunksUsed: contextChunks.length,
             images: contextChunks
-              .filter((c) => c.imageUrl)
-              .map((c) => c.imageUrl),
+              .filter((c: ContextChunk) => c.imageUrl)
+              .map((c: ContextChunk) => c.imageUrl),
           });
           controller.enqueue(encoder.encode(`\n<!--META:${metadata}-->`));
           controller.close();
         } catch (err) {
           console.error("Stream error:", err);
-          controller.enqueue(encoder.encode("\n\n*Error generating response.*"));
+          controller.enqueue(
+            encoder.encode("\n\n*Error generating response.*")
+          );
           controller.close();
         }
       },
@@ -164,10 +140,13 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
+    if (error instanceof Error && error.name === "ZodError") {
+      return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    }
     console.error("Chat error:", error);
-    return new Response(JSON.stringify({ error: "Internal server error" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }

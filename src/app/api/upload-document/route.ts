@@ -1,15 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServiceSupabase } from "@/lib/supabase";
+import { createClient, createServiceClient } from "@/lib/supabase";
 import { chunkText } from "@/lib/chunker";
-import { generateEmbeddings } from "@/lib/gemini";
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const pdfParseModule = require("pdf-parse");
-const pdfParse = pdfParseModule.default || pdfParseModule;
+import { generateEmbeddingsBatched } from "@/lib/rag";
 
-export const maxDuration = 60; // Vercel free tier max
+const pdfParseModule = require("pdf-parse");
+
+export const maxDuration = 120;
 
 export async function POST(request: NextRequest) {
   try {
+    const supabaseClient = await createClient();
+
+    const {
+      data: { user },
+    } = await supabaseClient.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const userId = user.id;
+    const serviceSupabase = createServiceClient();
+
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
 
@@ -20,14 +32,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = getServiceSupabase();
     const fileName = `${Date.now()}-${file.name.replace(/\s+/g, "_")}`;
 
-    // 1. Upload raw PDF to Supabase Storage
     const buffer = Buffer.from(await file.arrayBuffer());
-    const { error: uploadError } = await supabase.storage
+    const { error: uploadError } = await serviceSupabase.storage
       .from("document-assets")
-      .upload(`pdfs/${fileName}`, buffer, {
+      .upload(`pdfs/${userId}/${fileName}`, buffer, {
         contentType: "application/pdf",
         upsert: false,
       });
@@ -42,12 +52,11 @@ export async function POST(request: NextRequest) {
 
     const {
       data: { publicUrl },
-    } = supabase.storage
+    } = serviceSupabase.storage
       .from("document-assets")
-      .getPublicUrl(`pdfs/${fileName}`);
+      .getPublicUrl(`pdfs/${userId}/${fileName}`);
 
-    // 2. Extract text from PDF
-    const pdfData = await pdfParse(buffer);
+    const pdfData = await pdfParseModule.default(buffer);
     const rawText = pdfData.text;
 
     if (!rawText || rawText.trim().length === 0) {
@@ -57,21 +66,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 3. Chunk the text with math-aware, section-aware splitting
-    // 1000-word chunks with 200-word overlap — good balance of granularity & context
     const chunks = chunkText(rawText, 1000, 200);
 
-    // 3b. Count figures/diagrams referenced in the text
-    const figureMatches = rawText.match(/(?:Fig(?:ure)?\.?\s*\d+|TABLE\s+[IVX\d]+)/gi);
+    const figureMatches = rawText.match(
+      /(?:Fig(?:ure)?\.?\s*\d+|TABLE\s+[IVX\d]+)/gi
+    );
     const uniqueFigures = new Set(
-      (figureMatches || []).map((m: string) => m.replace(/\s+/g, " ").toLowerCase())
+      (figureMatches || []).map((m: string) =>
+        m.replace(/\s+/g, " ").toLowerCase()
+      )
     );
     const diagramCount = uniqueFigures.size;
 
-    // 4. Create document record
-    const { data: doc, error: docError } = await supabase
+    const { data: doc, error: docError } = await serviceSupabase
       .from("documents")
       .insert({
+        user_id: userId,
         title: file.name.replace(".pdf", ""),
         metadata: {
           pages: pdfData.numpages,
@@ -93,20 +103,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 5. Generate embeddings and insert chunks
-    const embeddings = await generateEmbeddings(chunks);
+    const embeddings = await generateEmbeddingsBatched(
+      chunks,
+      userId,
+      serviceSupabase
+    );
 
     const chunkRows = chunks.map((text, i) => ({
+      user_id: userId,
       document_id: doc.id,
       chunk_index: i,
       text_content: text,
       embedding: JSON.stringify(embeddings[i]),
     }));
 
-    // Insert in batches of 20
     for (let i = 0; i < chunkRows.length; i += 20) {
       const batch = chunkRows.slice(i, i + 20);
-      const { error: chunkError } = await supabase
+      const { error: chunkError } = await serviceSupabase
         .from("document_chunks")
         .insert(batch);
 
