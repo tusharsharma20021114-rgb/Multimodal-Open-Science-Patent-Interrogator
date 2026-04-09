@@ -57,9 +57,7 @@ export async function POST(request: NextRequest) {
     const supabaseClient = await createClient();
     const serviceSupabase = createServiceClient();
 
-    const {
-      data: { user },
-    } = await supabaseClient.auth.getUser();
+    const { data: { user } } = await supabaseClient.auth.getUser();
 
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -144,8 +142,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid input" }, { status: 400 });
     }
     console.error("Chat error:", error);
+    const details = error instanceof Error ? error.stack || error.message : String(error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Internal server error", details },
       { status: 500 }
     );
   }
