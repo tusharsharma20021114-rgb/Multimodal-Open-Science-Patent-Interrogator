@@ -11,9 +11,7 @@ export async function POST(request: NextRequest) {
   try {
     const supabaseClient = await createClient();
 
-    const {
-      data: { user },
-    } = await supabaseClient.auth.getUser();
+    const { data: { user } } = await supabaseClient.auth.getUser();
 
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -33,8 +31,9 @@ export async function POST(request: NextRequest) {
     }
 
     const fileName = `${Date.now()}-${file.name.replace(/\s+/g, "_")}`;
-
     const buffer = Buffer.from(await file.arrayBuffer());
+
+    // 1. Upload raw PDF safely using Service Role
     const { error: uploadError } = await serviceSupabase.storage
       .from("document-assets")
       .upload(`pdfs/${userId}/${fileName}`, buffer, {
@@ -43,7 +42,7 @@ export async function POST(request: NextRequest) {
       });
 
     if (uploadError) {
-      console.error("Upload error:", uploadError);
+      console.error("Storage error:", uploadError);
       return NextResponse.json(
         { error: "Failed to upload PDF to storage" },
         { status: 500 }
@@ -56,7 +55,11 @@ export async function POST(request: NextRequest) {
       .from("document-assets")
       .getPublicUrl(`pdfs/${userId}/${fileName}`);
 
-    const pdfData = await pdfParseModule.default(buffer);
+    // 2. Parse PDF text
+    // @ts-expect-error - Next.js server-side dynamic import workaround
+    const pdfParseModule = await import("pdf-parse/lib/pdf-parse.js");
+    const pdfParse = pdfParseModule.default || pdfParseModule;
+    const pdfData = await pdfParse(buffer);
     const rawText = pdfData.text;
 
     if (!rawText || rawText.trim().length === 0) {
