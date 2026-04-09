@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
       email,
       password,
       options: {
-        emailRedirectTo: `${request.nextUrl.origin}/auth/callback`,
+        emailRedirectTo: `${request.nextUrl.origin}/api/auth/callback`,
       },
     });
 
