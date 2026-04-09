@@ -1,16 +1,19 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   FileText,
   Layers,
   Search,
-  Image as ImageIcon,
-  Lock,
+  ImageIcon,
   BarChart3,
   TrendingUp,
   Activity,
+  LogOut,
+  User,
 } from "lucide-react";
+import Link from "next/link";
 import {
   AreaChart,
   Area,
@@ -20,6 +23,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { supabase } from "@/lib/supabase-client";
 
 interface Analytics {
   totals: {
@@ -39,86 +43,96 @@ interface Analytics {
 }
 
 export default function DashboardPage() {
-  const [authenticated, setAuthenticated] = useState(false);
-  const [password, setPassword] = useState("");
-  const [authError, setAuthError] = useState(false);
+  const router = useRouter();
   const [data, setData] = useState<Analytics | null>(null);
   const [loading, setLoading] = useState(true);
-
-  function handleLogin(e: React.FormEvent) {
-    e.preventDefault();
-    if (password === "admin123" || password.length > 0) {
-      setAuthenticated(true);
-      setAuthError(false);
-    } else {
-      setAuthError(true);
-    }
-  }
+  const [user, setUser] = useState<{ email: string } | null>(null);
 
   useEffect(() => {
-    if (!authenticated) return;
-    fetch("/api/analytics")
-      .then((res) => res.json())
-      .then((d) => {
-        setData(d);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, [authenticated]);
+    async function init() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        router.push("/auth/login");
+        return;
+      }
+      setUser({ email: user.email || "" });
 
-  if (!authenticated) {
-    return (
-      <div className="auth-gate">
-        <div className="glass-card auth-card">
-          <Lock size={28} color="var(--accent)" style={{ margin: "0 auto 1rem" }} />
-          <h2>Dashboard</h2>
-          <p>Enter password to view analytics</p>
-          <form onSubmit={handleLogin}>
-            <input
-              type="password"
-              className="auth-input"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoFocus
-            />
-            {authError && (
-              <p style={{ color: "var(--error)", fontSize: "0.82rem", marginBottom: 10 }}>
-                Invalid password
-              </p>
-            )}
-            <button type="submit" className="btn-primary" style={{ width: "100%" }}>
-              Continue
-            </button>
-          </form>
-        </div>
-      </div>
-    );
+      try {
+        const res = await fetch("/api/analytics");
+        const analyticsData = await res.json();
+        setData(analyticsData);
+      } catch (error) {
+        console.error("Failed to fetch analytics:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    init();
+  }, [router]);
+
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    router.push("/auth/login");
+    router.refresh();
   }
 
   if (loading) {
     return (
-      <div className="page-container" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
+      <div className="page-container loading-page">
         <div className="spinner" style={{ width: 28, height: 28, borderWidth: 2.5 }} />
       </div>
     );
   }
 
   const stats = [
-    { label: "Documents", value: data?.totals.documents || 0, icon: FileText, color: "#0D9488", bg: "rgba(13,148,136,0.06)" },
-    { label: "Text chunks", value: data?.totals.chunks || 0, icon: Layers, color: "#2563EB", bg: "rgba(37,99,235,0.06)" },
-    { label: "Queries", value: data?.totals.queries || 0, icon: Search, color: "#CA8A04", bg: "rgba(202,138,4,0.06)" },
-    { label: "Diagrams", value: data?.totals.diagrams || 0, icon: ImageIcon, color: "#E11D48", bg: "rgba(225,29,72,0.05)" },
+    {
+      label: "Documents",
+      value: data?.totals.documents || 0,
+      icon: FileText,
+      color: "#0D9488",
+      bg: "rgba(13,148,136,0.06)",
+    },
+    {
+      label: "Text chunks",
+      value: data?.totals.chunks || 0,
+      icon: Layers,
+      color: "#2563EB",
+      bg: "rgba(37,99,235,0.06)",
+    },
+    {
+      label: "Queries",
+      value: data?.totals.queries || 0,
+      icon: Search,
+      color: "#CA8A04",
+      bg: "rgba(202,138,4,0.06)",
+    },
+    {
+      label: "Diagrams",
+      value: data?.totals.diagrams || 0,
+      icon: ImageIcon,
+      color: "#E11D48",
+      bg: "rgba(225,29,72,0.05)",
+    },
   ];
 
   return (
     <div className="page-container">
-      <div className="page-header">
-        <h1 className="page-title">Dashboard</h1>
-        <p className="page-subtitle">System metrics and document analytics</p>
-      </div>
+      <header className="page-header-full">
+        <div className="header-content">
+          <h1 className="page-title">Dashboard</h1>
+          <p className="page-subtitle">System metrics and document analytics</p>
+        </div>
+        <div className="header-actions">
+          <span className="user-info">
+            <User size={14} />
+            {user?.email}
+          </span>
+          <button onClick={handleLogout} className="btn-icon">
+            <LogOut size={18} />
+          </button>
+        </div>
+      </header>
 
-      {/* Stats */}
       <div className="dashboard-grid">
         {stats.map((stat) => (
           <div key={stat.label} className="glass-card stat-card">
@@ -131,11 +145,10 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* Chart */}
       <div className="glass-card chart-container">
-        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: "1rem" }}>
-          <TrendingUp size={15} color="var(--accent)" />
-          <span className="chart-title" style={{ marginBottom: 0 }}>Query volume (30 days)</span>
+        <div className="chart-header">
+          <TrendingUp size={15} />
+          <span className="chart-title">Query volume (30 days)</span>
         </div>
         {data?.queryTimeSeries && data.queryTimeSeries.length > 0 ? (
           <ResponsiveContainer width="100%" height={260}>
@@ -161,9 +174,7 @@ export default function DashboardPage() {
                   background: "var(--bg-surface)",
                   border: "1px solid var(--border-light)",
                   borderRadius: 8,
-                  color: "var(--text-primary)",
                   fontSize: "0.82rem",
-                  boxShadow: "var(--shadow-md)",
                 }}
               />
               <Area
@@ -176,20 +187,17 @@ export default function DashboardPage() {
             </AreaChart>
           </ResponsiveContainer>
         ) : (
-          <div style={{ height: 180, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)" }}>
-            <div style={{ textAlign: "center" }}>
-              <Activity size={24} style={{ marginBottom: 6, opacity: 0.4 }} />
-              <p style={{ fontSize: "0.88rem" }}>No query data yet</p>
-            </div>
+          <div className="empty-chart">
+            <Activity size={24} />
+            <p>No query data yet</p>
           </div>
         )}
       </div>
 
-      {/* Table */}
       <div className="glass-card chart-container">
-        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: "1rem" }}>
-          <FileText size={15} color="var(--accent)" />
-          <span className="chart-title" style={{ marginBottom: 0 }}>Recent documents</span>
+        <div className="chart-header">
+          <FileText size={15} />
+          <span className="chart-title">Recent documents</span>
         </div>
         {data?.recentDocuments && data.recentDocuments.length > 0 ? (
           <div style={{ overflowX: "auto" }}>
@@ -205,7 +213,7 @@ export default function DashboardPage() {
               <tbody>
                 {data.recentDocuments.map((doc) => (
                   <tr key={doc.id}>
-                    <td style={{ fontWeight: 600, color: "var(--text-primary)" }}>{doc.title}</td>
+                    <td style={{ fontWeight: 600 }}>{doc.title}</td>
                     <td>{doc.total_chunks}</td>
                     <td>{doc.diagrams_extracted || 0}</td>
                     <td>{new Date(doc.upload_date).toLocaleDateString()}</td>
@@ -215,9 +223,7 @@ export default function DashboardPage() {
             </table>
           </div>
         ) : (
-          <p style={{ color: "var(--text-muted)", textAlign: "center", padding: "1.5rem 0", fontSize: "0.88rem" }}>
-            No documents yet
-          </p>
+          <p className="empty-table">No documents yet</p>
         )}
       </div>
     </div>

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServiceSupabase } from "@/lib/supabase";
+import { createServiceClient } from "@/lib/supabase";
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = getServiceSupabase();
+    const supabase = createServiceClient();
     const fileName = `diagrams/${documentId}/${Date.now()}-diagram.png`;
 
     const buffer = Buffer.from(await image.arrayBuffer());

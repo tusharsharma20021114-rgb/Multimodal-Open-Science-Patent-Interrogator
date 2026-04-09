@@ -7,15 +7,16 @@ import {
   Upload,
   MessageSquare,
   BarChart3,
+  ImageIcon,
 } from "lucide-react";
 
 export default function NavBar() {
   const pathname = usePathname();
 
   const links = [
-    { href: "/", label: "Home", icon: Home },
-    { href: "/upload", label: "Upload", icon: Upload },
     { href: "/chat", label: "Chat", icon: MessageSquare },
+    { href: "/upload", label: "Upload", icon: Upload },
+    { href: "/diagrams", label: "Diagrams", icon: ImageIcon },
     { href: "/dashboard", label: "Dashboard", icon: BarChart3 },
   ];
 
@@ -27,7 +28,7 @@ export default function NavBar() {
             <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
           </svg>
         </div>
-        RAG Engine
+        Multimodal RAG
       </Link>
       <ul className="nav-links">
         {links.map((link) => (

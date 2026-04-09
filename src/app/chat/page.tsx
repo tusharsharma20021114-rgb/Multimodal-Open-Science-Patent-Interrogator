@@ -1,46 +1,64 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Send, Loader2, FileText, ImageIcon } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Send, Loader2, FileText, ImageIcon, LogOut, User } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
-import { supabase } from "@/lib/supabase";
-
-interface Message {
-  role: "user" | "assistant";
-  content: string;
-  images?: string[];
-}
-
-interface Doc {
-  id: string;
-  title: string;
-}
+import { supabase } from "@/lib/supabase-client";
+import type { ChatMessage, Doc, DiagramListItem } from "@/types";
 
 export default function ChatPage() {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const router = useRouter();
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [documents, setDocuments] = useState<Doc[]>([]);
+  const [diagrams, setDiagrams] = useState<DiagramListItem[]>([]);
   const [selectedDoc, setSelectedDoc] = useState<string>("");
+  const [user, setUser] = useState<{ email: string } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    supabase
-      .from("documents")
-      .select("id, title")
-      .order("upload_date", { ascending: false })
-      .then(({ data }) => {
-        if (data) setDocuments(data);
-      });
-  }, []);
+    async function init() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        router.push("/auth/login");
+        return;
+      }
+      setUser({ email: user.email || "" });
+
+      const [docsRes, diagramsRes] = await Promise.all([
+        supabase
+          .from("documents")
+          .select("id, title")
+          .eq("user_id", user.id)
+          .order("upload_date", { ascending: false }),
+        supabase
+          .from("diagrams")
+          .select("id, document_id, page_number, image_url, label")
+          .eq("user_id", user.id)
+          .limit(20),
+      ]);
+
+      if (docsRes.data) setDocuments(docsRes.data);
+      if (diagramsRes.data) setDiagrams(diagramsRes.data);
+    }
+    init();
+  }, [router]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    router.push("/auth/login");
+    router.refresh();
+  }
 
   async function handleSend() {
     const query = input.trim();
@@ -100,7 +118,7 @@ export default function ChatPage() {
         ...prev,
         {
           role: "assistant",
-          content: "Sorry, something went wrong. Check your API keys and try again.",
+          content: "Sorry, something went wrong. Please try again.",
         },
       ]);
     } finally {
@@ -118,68 +136,47 @@ export default function ChatPage() {
 
   return (
     <div className="chat-container">
-      {/* Document selector — minimal */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          paddingBottom: 8,
-          borderBottom: "1px solid var(--border-light)",
-        }}
-      >
-        <FileText size={14} color="var(--text-muted)" />
-        <select
-          className="select-field"
-          value={selectedDoc}
-          onChange={(e) => setSelectedDoc(e.target.value)}
-          style={{ flex: 1, maxWidth: 320 }}
-        >
-          <option value="">All documents</option>
-          {documents.map((doc) => (
-            <option key={doc.id} value={doc.id}>
-              {doc.title}
-            </option>
-          ))}
-        </select>
-        <div className="pulse-dot" title="Connected" />
-      </div>
+      <header className="chat-header">
+        <div className="header-left">
+          <FileText size={18} />
+          <select
+            className="select-field"
+            value={selectedDoc}
+            onChange={(e) => setSelectedDoc(e.target.value)}
+          >
+            <option value="">All documents</option>
+            {documents.map((doc) => (
+              <option key={doc.id} value={doc.id}>
+                {doc.title}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="header-right">
+          <span className="user-email">
+            <User size={14} />
+            {user?.email}
+          </span>
+          <button onClick={handleLogout} className="btn-icon" title="Sign out">
+            <LogOut size={18} />
+          </button>
+        </div>
+      </header>
 
-      {/* Messages */}
       <div className="chat-messages">
         {messages.length === 0 && (
-          <div
-            style={{
-              flex: 1,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 8,
-            }}
-          >
-            <p
-              style={{
-                fontSize: "1.5rem",
-                fontWeight: 800,
-                letterSpacing: "-0.03em",
-                color: "var(--text-primary)",
-              }}
-            >
-              Ask your paper anything
-            </p>
-            <p
-              style={{
-                color: "var(--text-muted)",
-                fontSize: "0.88rem",
-                maxWidth: 380,
-                textAlign: "center",
-                lineHeight: 1.5,
-              }}
-            >
+          <div className="empty-state">
+            <h2>Ask your paper anything</h2>
+            <p>
               Select a document above, then ask about its methods, equations,
               results, or diagrams.
             </p>
+            {diagrams.length > 0 && (
+              <div className="diagrams-hint">
+                <ImageIcon size={16} />
+                <span>{diagrams.length} diagrams available for analysis</span>
+              </div>
+            )}
           </div>
         )}
 
@@ -196,34 +193,14 @@ export default function ChatPage() {
               msg.content
             )}
             {msg.images && msg.images.length > 0 && (
-              <div style={{ marginTop: 10, display: "flex", gap: 6, flexWrap: "wrap" }}>
+              <div className="diagram-gallery">
                 {msg.images.map((url, j) => (
-                  <div
-                    key={j}
-                    style={{
-                      border: "1px solid var(--border-light)",
-                      borderRadius: 8,
-                      overflow: "hidden",
-                      maxWidth: 180,
-                    }}
-                  >
-                    <div
-                      style={{
-                        padding: "3px 6px",
-                        background: "var(--bg-muted)",
-                        fontSize: "0.7rem",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 3,
-                        color: "var(--text-muted)",
-                        fontWeight: 500,
-                      }}
-                    >
-                      <ImageIcon size={9} />
+                  <div key={j} className="diagram-thumbnail">
+                    <img src={url} alt={`Diagram ${j + 1}`} />
+                    <div className="diagram-label">
+                      <ImageIcon size={12} />
                       Diagram
                     </div>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={url} alt={`Diagram ${j + 1}`} style={{ width: "100%", display: "block" }} />
                   </div>
                 ))}
               </div>
@@ -234,16 +211,13 @@ export default function ChatPage() {
         {loading && (
           <div className="message-bubble assistant">
             <div className="typing-indicator">
-              <span />
-              <span />
-              <span />
+              <span /><span /><span />
             </div>
           </div>
         )}
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
       <div className="chat-input-area">
         <textarea
           ref={inputRef}
@@ -259,7 +233,6 @@ export default function ChatPage() {
           className="btn-primary"
           onClick={handleSend}
           disabled={loading || !input.trim()}
-          style={{ padding: "11px 14px" }}
         >
           {loading ? <Loader2 size={16} className="spinner" /> : <Send size={16} />}
         </button>

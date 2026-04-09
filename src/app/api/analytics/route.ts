@@ -1,41 +1,51 @@
 import { NextResponse } from "next/server";
-import { getServiceSupabase } from "@/lib/supabase";
+import { createClient, createServiceClient } from "@/lib/supabase";
 
 export async function GET() {
   try {
-    const supabase = getServiceSupabase();
+    const supabaseClient = await createClient();
+    const serviceSupabase = createServiceClient();
 
-    // Get totals
-    const { count: totalDocs } = await supabase
+    const {
+      data: { user },
+    } = await supabaseClient.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const userId = user.id;
+
+    const { count: totalDocs } = await serviceSupabase
       .from("documents")
-      .select("*", { count: "exact", head: true });
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId);
 
-    const { count: totalChunks } = await supabase
+    const { count: totalChunks } = await serviceSupabase
       .from("document_chunks")
-      .select("*", { count: "exact", head: true });
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId);
 
-    const { count: totalQueries } = await supabase
+    const { count: totalQueries } = await serviceSupabase
       .from("query_logs")
-      .select("*", { count: "exact", head: true });
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId);
 
-    const { data: diagData } = await supabase
-      .from("documents")
-      .select("diagrams_extracted");
+    const { count: totalDiagrams } = await serviceSupabase
+      .from("diagrams")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId);
 
-    const totalDiagrams =
-      diagData?.reduce((sum, d) => sum + (d.diagrams_extracted || 0), 0) || 0;
-
-    // Get queries over time (last 30 days, grouped by day)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    const { data: recentQueries } = await supabase
+    const { data: recentQueries } = await serviceSupabase
       .from("query_logs")
       .select("created_at")
+      .eq("user_id", userId)
       .gte("created_at", thirtyDaysAgo.toISOString())
       .order("created_at", { ascending: true });
 
-    // Group by day
     const queryByDay: Record<string, number> = {};
     recentQueries?.forEach((q) => {
       const day = new Date(q.created_at).toISOString().split("T")[0];
@@ -47,37 +57,22 @@ export async function GET() {
       queries: count,
     }));
 
-    // Get recent documents
-    const { data: recentDocs } = await supabase
+    const { data: recentDocs } = await serviceSupabase
       .from("documents")
       .select("id, title, total_chunks, diagrams_extracted, upload_date")
+      .eq("user_id", userId)
       .order("upload_date", { ascending: false })
       .limit(10);
-
-    // Get top queried documents
-    const { data: topQueried } = await supabase
-      .from("query_logs")
-      .select("document_id")
-      .not("document_id", "is", null);
-
-    const docQueryCounts: Record<string, number> = {};
-    topQueried?.forEach((q) => {
-      if (q.document_id) {
-        docQueryCounts[q.document_id] =
-          (docQueryCounts[q.document_id] || 0) + 1;
-      }
-    });
 
     return NextResponse.json({
       totals: {
         documents: totalDocs || 0,
         chunks: totalChunks || 0,
         queries: totalQueries || 0,
-        diagrams: totalDiagrams,
+        diagrams: totalDiagrams || 0,
       },
       queryTimeSeries,
       recentDocuments: recentDocs || [],
-      topQueriedDocuments: docQueryCounts,
     });
   } catch (error) {
     console.error("Analytics error:", error);
