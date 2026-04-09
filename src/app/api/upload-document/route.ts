@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
     let rawText = "";
     let diagramCount = 0;
     let diagramsToInsert: any[] = [];
-    const numPages = 1; // Default fallback
+    let numPages = 1; // Default fallback
 
     const llamaKey = process.env.LLAMA_CLOUD_API_KEY;
 
@@ -141,6 +141,7 @@ export async function POST(request: NextRequest) {
       const pdfParse = pdfParseModule.default || pdfParseModule;
       const pdfData = await pdfParse(buffer);
       rawText = pdfData.text;
+      numPages = pdfData.numpages;
 
       const figureMatches = rawText.match(/(?:Fig(?:ure)?\.?\s*\d+|TABLE\s+[IVX\d]+)/gi);
       diagramCount = new Set((figureMatches || []).map((m: string) => m.replace(/\s+/g, " ").toLowerCase())).size;
@@ -154,7 +155,7 @@ export async function POST(request: NextRequest) {
         user_id: userId,
         title: file.name.replace(".pdf", ""),
         metadata: {
-          pages: pdfData.numpages,
+          pages: numPages,
           size: file.size,
           originalName: file.name,
         },
@@ -209,7 +210,7 @@ export async function POST(request: NextRequest) {
       documentId: doc.id,
       title: file.name.replace(".pdf", ""),
       chunks: chunks.length,
-      pages: pdfData.numpages,
+      pages: numPages,
     });
   } catch (error) {
     console.error("Upload processing error:", error);
