@@ -88,7 +88,7 @@ export default function UploadPage() {
 
         if (!res.ok) {
           const err = await res.json();
-          throw new Error(err.error || "Upload failed");
+          throw new Error(err.details ? `${err.error}: ${err.details}` : err.error || "Upload failed");
         }
 
         const data = await res.json();

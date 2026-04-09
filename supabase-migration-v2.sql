@@ -36,15 +36,15 @@ CREATE TABLE IF NOT EXISTS embedding_cache (
 -- 5. Update documents table structure
 ALTER TABLE documents ALTER COLUMN user_id DROP DEFAULT;
 ALTER TABLE documents ALTER COLUMN user_id SET NOT NULL;
-ALTER TABLE documents ALTER COLUMN user_id REFERENCES auth.users(id) ON DELETE CASCADE;
+ALTER TABLE documents ADD CONSTRAINT fk_documents_user_id FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
 
 ALTER TABLE document_chunks ALTER COLUMN user_id DROP DEFAULT;
 ALTER TABLE document_chunks ALTER COLUMN user_id SET NOT NULL;
-ALTER TABLE document_chunks ALTER COLUMN user_id REFERENCES auth.users(id) ON DELETE CASCADE;
+ALTER TABLE document_chunks ADD CONSTRAINT fk_chunks_user_id FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
 
 ALTER TABLE query_logs ALTER COLUMN user_id DROP DEFAULT;
 ALTER TABLE query_logs ALTER COLUMN user_id SET NOT NULL;
-ALTER TABLE query_logs ALTER COLUMN user_id REFERENCES auth.users(id) ON DELETE CASCADE;
+ALTER TABLE query_logs ADD CONSTRAINT fk_query_logs_user_id FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
 
 -- 6. Create indexes for performance
 CREATE INDEX IF NOT EXISTS idx_documents_user_id ON documents(user_id);

@@ -137,8 +137,9 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Upload processing error:", error);
+    const errorMessage = error instanceof Error ? error.stack || error.message : String(error);
     return NextResponse.json(
-      { error: "Internal server error during processing" },
+      { error: "Internal server error during processing", details: errorMessage },
       { status: 500 }
     );
   }
