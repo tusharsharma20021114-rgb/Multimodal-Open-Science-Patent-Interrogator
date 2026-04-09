@@ -61,56 +61,76 @@ export async function POST(request: NextRequest) {
     let diagramsToInsert: any[] = [];
     const numPages = 1; // Default fallback
 
-    const unstructuredKey = process.env.UNSTRUCTURED_API_KEY;
+    const llamaKey = process.env.LLAMA_CLOUD_API_KEY;
 
-    if (unstructuredKey && unstructuredKey.trim().length > 0) {
+    if (llamaKey && llamaKey.trim().length > 0) {
       try {
-        const unstrFormData = new FormData();
-        unstrFormData.append("files", file);
-        unstrFormData.append("strategy", "hi_res");
-        unstrFormData.append("extract_image_block_types", '["Image", "Table"]');
+        const llamaFormData = new FormData();
+        llamaFormData.append("file", file);
+        // Premium mode is required for image extraction
+        llamaFormData.append("premium_mode", "true");
 
-        const unstrRes = await fetch("https://api.unstructuredapp.io/general/v0/general", {
+        const uploadRes = await fetch("https://api.cloud.llamaindex.ai/api/parsing/upload", {
           method: "POST",
-          headers: {
-            "unstructured-api-key": unstructuredKey,
-            accept: "application/json",
-          },
-          body: unstrFormData,
+          headers: { Authorization: `Bearer ${llamaKey}` },
+          body: llamaFormData,
         });
 
-        if (!unstrRes.ok) {
-          throw new Error(`Unstructured API failed: ${await unstrRes.text()}`);
+        if (!uploadRes.ok) throw new Error(`LlamaParse upload failed: ${await uploadRes.text()}`);
+        const { id: jobId } = await uploadRes.json();
+
+        let status = "PENDING";
+        let attempts = 0;
+        while (status === "PENDING" && attempts < 25) {
+          await new Promise((r) => setTimeout(r, 2000));
+          const statusRes = await fetch(`https://api.cloud.llamaindex.ai/api/parsing/job/${jobId}`, {
+            headers: { Authorization: `Bearer ${llamaKey}` },
+          });
+          const statusData = await statusRes.json();
+          status = statusData.status;
+          if (status === "ERROR") throw new Error("LlamaParse job failed internally");
+          attempts++;
         }
 
-        const elements = await unstrRes.json();
-        for (const el of elements) {
-          if (["Title", "NarrativeText", "ListItem", "Text"].includes(el.type)) {
-            rawText += el.text + "\n\n";
-          }
-          if (["Image", "Table", "Figure"].includes(el.type) && el.metadata?.image_base64) {
-             diagramCount++;
-             const pageNum = el.metadata.page_number || 1;
-             const imgBuffer = Buffer.from(el.metadata.image_base64, "base64");
-             const imgFileName = `pdfs/${userId}/${fileName.replace(".pdf", "")}_diagram_${diagramCount}.png`;
+        if (status === "SUCCESS") {
+          const mdRes = await fetch(`https://api.cloud.llamaindex.ai/api/parsing/job/${jobId}/result/markdown`, {
+            headers: { Authorization: `Bearer ${llamaKey}` },
+          });
+          const mdData = await mdRes.json();
+          rawText = mdData.markdown || "";
 
-             const { error: upErr } = await serviceSupabase.storage
-               .from("document-assets")
-               .upload(imgFileName, imgBuffer, { contentType: "image/png" });
+          const imgRes = await fetch(`https://api.cloud.llamaindex.ai/api/parsing/job/${jobId}/result/images`, {
+            headers: { Authorization: `Bearer ${llamaKey}` },
+          });
+          if (imgRes.ok) {
+            const imagesInfo = await imgRes.json();
+            for (const img of imagesInfo) {
+              diagramCount++;
+              const imgBinRes = await fetch(`https://api.cloud.llamaindex.ai/api/parsing/job/${jobId}/result/images/${img.name}`, {
+                headers: { Authorization: `Bearer ${llamaKey}` },
+              });
+              const arrayBuffer = await imgBinRes.arrayBuffer();
+              const imgBuffer = Buffer.from(arrayBuffer);
+              const imgFileName = `pdfs/${userId}/${fileName.replace(".pdf", "")}_diagram_${diagramCount}.png`;
 
-             if (!upErr) {
-               const { data: { publicUrl: imgUrl } } = serviceSupabase.storage.from("document-assets").getPublicUrl(imgFileName);
-               diagramsToInsert.push({
-                 user_id: userId,
-                 page_number: pageNum,
-                 image_url: imgUrl,
-                 label: `${el.type} ${diagramCount}`
-               });
-             }
+              const { error: upErr } = await serviceSupabase.storage
+                .from("document-assets")
+                .upload(imgFileName, imgBuffer, { contentType: "image/png" });
+
+              if (!upErr) {
+                const { data: { publicUrl: imgUrl } } = serviceSupabase.storage.from("document-assets").getPublicUrl(imgFileName);
+                diagramsToInsert.push({
+                  user_id: userId,
+                  page_number: 1, // LlamaParse REST doesn't map exact pages inherently via this endpoint
+                  image_url: imgUrl,
+                  label: `Extracted Figure ${diagramCount}`
+                });
+              }
+            }
           }
         }
       } catch (err) {
-        console.error("Unstructured API error, falling back to pdf-parse.", err);
+        console.error("LlamaParse API error, falling back to pdf-parse.", err);
       }
     }
 
