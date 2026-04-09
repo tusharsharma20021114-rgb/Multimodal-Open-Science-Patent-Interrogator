@@ -33,16 +33,29 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const isAuthPage = request.nextUrl.pathname.startsWith("/auth");
-  const isStaticFile = request.nextUrl.pathname.includes(".");
+  const publicPaths = [
+    "/",
+    "/auth/login",
+    "/auth/register",
+    "/api/auth/callback",
+    "/api/auth/login",
+    "/api/auth/register"
+  ];
 
-  if (!user && !isAuthPage && !isStaticFile) {
+  const currentPath = request.nextUrl.pathname;
+  const isPublicPath = publicPaths.includes(currentPath);
+
+  if (!user && !isPublicPath) {
+    // If it's an API request, return 401 Unauthorized instead of HTML redirect
+    if (currentPath.startsWith("/api/")) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const url = request.nextUrl.clone();
     url.pathname = "/auth/login";
     return NextResponse.redirect(url);
   }
 
-  if (user && isAuthPage) {
+  if (user && currentPath.startsWith("/auth/")) {
     const url = request.nextUrl.clone();
     url.pathname = "/chat";
     return NextResponse.redirect(url);
@@ -50,3 +63,9 @@ export async function middleware(request: NextRequest) {
 
   return supabaseResponse;
 }
+
+export const config = {
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+  ],
+};
