@@ -119,7 +119,7 @@ export async function searchDocuments(
   const queryEmbedding = await generateEmbeddingCached(query, userId, supabase);
 
   const { data: chunks, error } = await supabase.rpc("match_document_chunks", {
-    query_embedding: JSON.stringify(queryEmbedding),
+    query_embedding: queryEmbedding,
     match_threshold: 0.2,
     match_count: 15,
     filter_document_id: documentId || null,
